@@ -15,7 +15,7 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 
 - Keylogging  
 - Screenshot  
-- Webcam access  
+  - Webcam access  
 - Data download / upload  
 - Credential harvesting  
   - Web  
