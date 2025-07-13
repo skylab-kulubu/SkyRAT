@@ -1,4 +1,15 @@
-# Remote Access Trojan Project Scope
+# ⚠️ Disclaimer
+
+This project is intended **solely for educational and research purposes**.  
+It simulates the behavior of Remote Access Trojans (RATs) to explore malware detection, system vulnerabilities, and defensive strategies in controlled environments.
+
+**Do not use this project on unauthorized systems or in production environments.**  
+Misuse may violate laws and ethical standards, and could result in severe legal consequences.  
+The author assumes **no responsibility** for any damage or misuse of the information provided.
+
+---
+
+# RAT Project Scope
 
 ## Actions Possible on the Compromised Device
 
