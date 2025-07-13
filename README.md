@@ -59,3 +59,9 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 
 - A **stager program** can be developed to deliver the main RAT program.  
 - A **payload (shellcode)** can be created to deliver the stager program.
+
+---
+## Authors
+- [Mertcan Yavaşoğlu](https://github.com/MertcanYavasoglu)
+- [Nilay Karamustafaoğlu](https://github.com/NilayKaramustafaoglu0)
+- [Yusuf Emir Gökdoğan](https://github.com/ygokdogan)
