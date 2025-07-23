@@ -20,13 +20,30 @@ def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
-    host = 'localhost'
-    port = 27015
+    print("""\
     
+    ___          ___    _  _____
+  ,' _/ /7 _ __ / o | .' \/_  _/
+ _\ `. //_7\V //  ,' / o / / /  
+/___,'//\\\\  )//_/`_\/_n_/ /_/   
+           //                   
+
+    """)
+    
+    host = 'localhost'
+    port = input("Enter port number to start the server: ")
+    try:
+        port = int(port)
+    except ValueError:
+        print("Invalid port number. Please enter a valid integer.")
+        return
+    if port < 1024 or port > 65535:
+        print("Port number must be between 1024 and 65535.")
+        return
     server.bind((host, port))
     server.listen(5)
     print(f"TCP Server listening on {host}:{port}")
-    
+
     try:
         while True:
             client_socket, addr = server.accept()
@@ -37,6 +54,25 @@ def start_server():
         print("\nServer shutting down...")
     finally:
         server.close()
+
+def help:
+
+def keylogger:
+
+
+def cli(args):
+    command_list = {"help", "keylogger"}
+    if args not in command_list:
+        print("Available commands: " + command_list)
+    else:
+        for i in range(len(command_list)):
+            if args == command_list[i]:
+                # todo
+                
+
+
+
+
 
 if __name__ == "__main__":
     start_server()
