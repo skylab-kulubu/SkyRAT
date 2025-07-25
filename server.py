@@ -4,12 +4,14 @@ from os import getenv
 
 def handle_client(client_socket, addr):
     print(f"Connection from {addr}")
+    recv_size = int(getenv("RECV_SIZE","1024"))
+    encode = str(getenv("ENCODE","utf-8"))
     try:
         while True:
-            data = client_socket.recv(1024)
+            data = client_socket.recv(recv_size)
             if not data:
                 break
-            message = data.decode('utf-8')
+            message = data.decode(encode)
             print(f"Received from {addr}: {message}")
     except Exception as e:
         print(f"Error with client {addr}: {e}")
@@ -45,7 +47,6 @@ def start_server():
         print("Port number must lower then 65535")
     server.bind((host, port))
     server.listen(5)
-
     print(f"TCP Server listening on {host}:{port}")
 
     try:
