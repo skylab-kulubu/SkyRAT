@@ -1,7 +1,10 @@
 import socket
 import threading
 from os import getenv
+from dotenv import load_dotenv
 
+# Load .env    
+load_dotenv()
 def handle_client(client_socket, addr):
     print(f"Connection from {addr}")
     recv_size = int(getenv("RECV_SIZE","1024"))
