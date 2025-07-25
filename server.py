@@ -1,5 +1,6 @@
 import socket
 import threading
+from os import getenv
 
 def handle_client(client_socket, addr):
     print(f"Connection from {addr}")
@@ -30,8 +31,8 @@ def start_server():
 
     """)
     
-    host = 'localhost'
-    port = input("Enter port number to start the server: ")
+    host = getenv("LHOST","localhost")
+    port = getenv("LPORT","1911")
     try:
         port = int(port)
     except ValueError:
