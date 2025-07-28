@@ -63,9 +63,11 @@ def start_server():
     finally:
         server.close()
 
-def help:
+def help():
+    pass
 
-def keylogger:
+def keylogger():
+    pass
 
 
 def cli(args):
