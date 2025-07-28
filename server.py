@@ -1,6 +1,7 @@
 import socket
 import threading
 
+OUT_FILE="output.txt"
 def handle_client(client_socket, addr):
     print(f"Connection from {addr}")
     try:
@@ -15,6 +16,10 @@ def handle_client(client_socket, addr):
     finally:
         client_socket.close()
         print(f"Connection with {addr} closed")
+
+def out_new_line(data:str,outfile:str="output.txt"):
+    with open(outfile,"a") as file:
+        file.write(f"{data}\n")
 
 def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
