@@ -3,12 +3,15 @@ import threading
 from os import getenv
 from dotenv import load_dotenv
 
+
 # Load .env    
 load_dotenv()
 LHOST = getenv("LHOST","localLHOST")
 LPORT = getenv("LPORT","1911")
 RECV_SIZE = int(getenv("RECV_SIZE","1024"))
 ENCODING = str(getenv("ENCODE","utf-8"))
+OUT_FILE="output.txt"
+
 def handle_client(client_socket, addr):
     print(f"Connection from {addr}")
     try:
@@ -23,6 +26,11 @@ def handle_client(client_socket, addr):
     finally:
         client_socket.close()
         print(f"Connection with {addr} closed")
+
+
+def out_new_line(data:str,outfile:str="output.txt"):
+    with open(outfile,"a") as file:
+        file.write(f"{data}\n")
 
 def start_server(LPORT=LPORT):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
