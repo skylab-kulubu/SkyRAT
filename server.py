@@ -63,15 +63,16 @@ def start_server(LPORT=LPORT):
     finally:
         server.close()
 
-def help:
-
-def keylogger:
+def help():
+    pass
+def keylogger():
+    pass
 
 
 def cli(args):
-    command_list = {"help", "keylogger"}
+    command_list = ["help", "keylogger"]
     if args not in command_list:
-        print("Available commands: " + command_list)
+        print("Available commands: " + ", ".join(command_list))
     else:
         for i in range(len(command_list)):
             if args == command_list[i]:
