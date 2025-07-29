@@ -1,15 +1,25 @@
 import socket
 import threading
+from os import getenv
+from dotenv import load_dotenv
 
+
+# Load .env    
+load_dotenv()
+LHOST = getenv("LHOST","localLHOST")
+LPORT = getenv("LPORT","1911")
+RECV_SIZE = int(getenv("RECV_SIZE","1024"))
+ENCODING = str(getenv("ENCODE","utf-8"))
 OUT_FILE="output.txt"
+
 def handle_client(client_socket, addr):
     print(f"Connection from {addr}")
     try:
         while True:
-            data = client_socket.recv(1024)
+            data = client_socket.recv(RECV_SIZE)
             if not data:
                 break
-            message = data.decode('utf-8')
+            message = data.decode(ENCODING)
             print(f"Received from {addr}: {message}")
     except Exception as e:
         print(f"Error with client {addr}: {e}")
@@ -17,11 +27,12 @@ def handle_client(client_socket, addr):
         client_socket.close()
         print(f"Connection with {addr} closed")
 
+
 def out_new_line(data:str,outfile:str="output.txt"):
     with open(outfile,"a") as file:
         file.write(f"{data}\n")
 
-def start_server():
+def start_server(LPORT=LPORT):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
@@ -35,19 +46,19 @@ def start_server():
 
     """)
     
-    host = 'localhost'
-    port = input("Enter port number to start the server: ")
     try:
-        port = int(port)
+        LPORT = int(LPORT)
     except ValueError:
-        print("Invalid port number. Please enter a valid integer.")
+        print("Invalid LPORT number. Please enter a valid integer.")
         return
-    if port < 1024 or port > 65535:
-        print("Port number must be between 1024 and 65535.")
-        return
-    server.bind((host, port))
+    if LPORT < 1024:
+        print("You must start the program as root to use LPORT 1024 and gold.")
+        print("If the program does not work, change the LPORT number to a value greater than 1024.")
+    elif LPORT > 65535:
+        print("Port number must lower then 65535")
+    server.bind((LHOST, LPORT))
     server.listen(5)
-    print(f"TCP Server listening on {host}:{port}")
+    print(f"TCP Server listening on {LHOST}:{LPORT}")
 
     try:
         while True:
@@ -60,24 +71,20 @@ def start_server():
     finally:
         server.close()
 
-def help:
-
-def keylogger:
+def help():
+    pass
+def keylogger():
+    pass
 
 
 def cli(args):
-    command_list = {"help", "keylogger"}
+    command_list = ["help", "keylogger"]
     if args not in command_list:
-        print("Available commands: " + command_list)
+        print("Available commands: " + ", ".join(command_list))
     else:
         for i in range(len(command_list)):
             if args == command_list[i]:
                 # todo
                 
-
-
-
-
-
 if __name__ == "__main__":
     start_server()
