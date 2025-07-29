@@ -77,10 +77,5 @@ def cli(args):
             if args == command_list[i]:
                 # todo
                 
-
-
-
-
-
 if __name__ == "__main__":
     start_server()
