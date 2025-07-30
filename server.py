@@ -81,7 +81,7 @@ def handle_client(client_socket, addr):
             logger.debug(f"DATA SIZE = {len(data)}")
             message = data.decode(ENCODING)
 
-            logger.info(f"\nReceived from {addr}: {message}\n{PROMPT}")
+            logger.info(f"\nReceived from {addr}: {message}\n")
 
     except Exception as e:
         logger.error(f"Error with client {addr}: {e}")
@@ -138,7 +138,7 @@ def start_server(LPORT=LPORT):
     server.bind((LHOST, LPORT))
     server.listen(5)
 
-    logger.info(f"\nTCP Server listening on {LHOST}:{LPORT}\n{PROMPT}")
+    logger.info(f"\nTCP Server listening on {LHOST}:{LPORT}\n")
 
 
     try:
