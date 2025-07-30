@@ -13,16 +13,6 @@ import sys
 # beautify terminal
 # make it for multiple clients
 # send commands to the client side to start the modules
-'''
-            'type': 'system_info',
-            'os': platform.system(),
-            'version': platform.version(),
-            'machine': platform.machine(),
-            'processor': platform.processor(),
-            'memory': psutil.virtual_memory().total,
-            'timestamp': time.time()
-'''
-
 
 # Load .env    
 load_dotenv()
@@ -117,7 +107,7 @@ def terminal(args):
     else:
         print("Invalid command. Available commands:", ", ".join(commands.keys()))
                 
-
+# working on it
 def send_command_to_client(client_socket, command):
     try:
         client_socket.send(json.dumps(command).encode(ENCODING))
@@ -157,5 +147,4 @@ Type 'exit' to quit the server.
                     print("\n[!] Interrupted. Exiting...")
                     break
         elif menu_input == "exit":
-            print("Goodbye.")
-            break
+            terminal("exit")
