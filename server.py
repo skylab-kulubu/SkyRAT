@@ -5,6 +5,8 @@ from os import getenv
 from dotenv import load_dotenv
 import sys
 import logging
+from datetime import datetime
+import pytz
 
 # TO DO LIST
 
@@ -47,7 +49,17 @@ LHOST = getenv("LHOST","localLHOST")
 LPORT = getenv("LPORT","1911")
 RECV_SIZE = int(getenv("RECV_SIZE","1024"))
 ENCODING = str(getenv("ENCODE","utf-8"))
-OUT_FILE="output.txt"
+OUT_FILE=str(getenv("OUT_FILE","output"))
+OUTPUT_FORMAT=str(getenv("OUTPUT_FORMAT","CLF")) # Options: CLF, JSON (to-do)
+"""
+CLF Log Format Sample
+192.168.122.16 - john [10/Oct/2000:13:55:36 -0700] "PRESS D" 768
+<src_addr> - <user or agent name> <time_stamp> <action> <bytes_sent>
+
+JSON Log Format Sample
+TO-DO
+"""
+OUTPUT_TIMEZONE=str(getenv("OUTPUT_TIMEZONE","UTC"))
 PROMPT = getenv("PROMPT","$ ")
 
 
@@ -78,9 +90,35 @@ def handle_client(client_socket, addr):
         logger.info(f"Connection with {addr} closed")
 
 
-def out_new_line(data:str,outfile:str="output.txt"):
+def out_new_line(addr:str,
+                 message:str,
+                 size:int,
+                 outfile:str=OUT_FILE,
+                 format:str=OUTPUT_FORMAT):
+    """
+    addr -> addr from handle_client
+    message -> data.encode(ENCODING) from handle_client
+    size -> len(data) from handle_client
+    """
     with open(outfile,"a") as file:
-        file.write(f"{data}\n")
+        match format:
+            case "CLF":
+                timezone = pytz.timezone(OUTPUT_TIMEZONE)
+                now_utc = datetime.now(timezone)
+                clf_time = now_utc.strftime('[%d/%b/%Y:%H:%M:%S %z]')
+                line = f"{addr} - john {clf_time} {message} {size}"
+                file.write(f"{line}\n")
+            case "JSON":
+                # TO-DO
+                pass
+            case _:
+                print("""
+                Invalid output format 
+                Avaliable log formats
+                    - CLF
+                    - JSON
+                """
+                )
 
 # initialize server
 def start_server(LPORT=LPORT):
