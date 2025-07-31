@@ -58,7 +58,7 @@ def get_rsa_chiper(private_key_path:str=PRIVATE_KEY_PATH):
         return cipher_rsa
     except FileNotFoundError:
         want_generate_keys=input(f"Could not found {private_key_path}, you want to generate a new key pair? [Y/n]")
-        if want_generate_keys.lower is "y" or want_generate_keys.strip() == "":
+        if want_generate_keys.lower == "y" or want_generate_keys.strip() == "":
             generate_key_pair()
             get_rsa_chiper()
 
@@ -74,7 +74,7 @@ def handle_client(client_socket, addr,encoding:str=ENCODING,recv_size:int=RECV_S
             logger.debug(f"DATA SIZE = {len(data)}")
             try:
                 decrypted = rsa_chipher.decrypt(base64.b64decode(data))
-                message = decrypted.decode(ENCODING)
+                message = decrypted.decode(encoding)
                 logger.info(f"\nReceived from {addr}: {message}\n")
             except Exception as e:
                 logger.error(f"RSA decrypt error: {e}")
