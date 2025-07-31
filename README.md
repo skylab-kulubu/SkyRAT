@@ -53,6 +53,30 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 - Desired commands and input rules will be defined.  
 - A **parsing algorithm** will be written to handle command processing.  
 
+### Podman/Docker Quick Start
+
+#### Podman
+
+```bash
+podman build -t skyRAT-server .
+podman run --rm -it -p 4545:4545 \
+-e LHOST='0.0.0.0' \
+-e LPORT=4545 \
+-v ./private.pem:/server/private.pem \
+localhost/skyRAT-server
+```
+
+#### Docker
+
+```bash
+docker build -t skyRAT-server .
+docker run --rm -it -p 4545:4545 \
+-e LHOST='0.0.0.0' \
+-e LPORT=4545 \
+-v ./private.pem:/server/private.pem \
+skyRAT-server
+```
+
 ---
 
 ## Optional Features
@@ -61,7 +85,9 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 - A **payload (shellcode)** can be created to deliver the stager program.
 
 ---
+
 ## Authors
+
 - [Mertcan Yavaşoğlu](https://github.com/MertcanYavasoglu)
 - [Nilay Karamustafaoğlu](https://github.com/NilayKaramustafaoglu0)
 - [Yusuf Emir Gökdoğan](https://github.com/ygokdogan)
