@@ -202,3 +202,5 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 tests.py
+private.pem
+public.pem
