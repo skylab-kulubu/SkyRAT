@@ -43,6 +43,7 @@ logger.debug(f"LPORT={LPORT}")
 logger.debug(f"RECV_SIZE={RECV_SIZE}")
 logger.debug(f"ENCODING={ENCODING}")
 logger.debug(f"OUT_FILE={OUT_FILE}")
+logger.debug(f"OUTPUT_TIMEZONE={OUTPUT_TIMEZONE}")
 
 
 # connection handler
