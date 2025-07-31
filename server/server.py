@@ -47,6 +47,7 @@ logger.debug(f"LPORT={LPORT}")
 logger.debug(f"RECV_SIZE={RECV_SIZE}")
 logger.debug(f"ENCODING={ENCODING}")
 logger.debug(f"OUT_FILE={OUT_FILE}")
+logger.debug(f"OUTPUT_TIMEZONE={OUTPUT_TIMEZONE}")
 
 def get_rsa_chiper(private_key_path:str=PRIVATE_KEY_PATH):
     with open(private_key_path, "rb") as f:
@@ -56,12 +57,11 @@ def get_rsa_chiper(private_key_path:str=PRIVATE_KEY_PATH):
 
 rsa_chipher=get_rsa_chiper()
 # connection handler
-def handle_client(client_socket, addr):
-
+def handle_client(client_socket, addr,encoding:str=ENCODING,recv_size:int=RECV_SIZE):
     logger.info(f"\nConnection from {addr}")
     try:
         while True:
-            data = client_socket.recv(RECV_SIZE)
+            data = client_socket.recv(recv_size)
             if not data:
                 break
             logger.debug(f"DATA SIZE = {len(data)}")
@@ -71,6 +71,7 @@ def handle_client(client_socket, addr):
                 logger.info(f"\nReceived from {addr}: {message}\n")
             except Exception as e:
                 logger.error(f"RSA decrypt error: {e}")
+
     except Exception as e:
         logger.error(f"Error with client {addr}: {e}")
     finally:
@@ -82,7 +83,9 @@ def out_new_line(addr:str,
                  message:str,
                  size:int,
                  outfile:str=OUT_FILE,
-                 format:str=OUTPUT_FORMAT):
+                 format:str=OUTPUT_FORMAT,
+                 time_zone:str=OUTPUT_TIMEZONE
+                 ):
     """
     addr -> addr from handle_client
     message -> data.encode(ENCODING) from handle_client
@@ -91,7 +94,7 @@ def out_new_line(addr:str,
     with open(outfile,"a") as file:
         match format:
             case "CLF":
-                timezone = pytz.timezone(OUTPUT_TIMEZONE)
+                timezone = pytz.timezone(time_zone)
                 now_utc = datetime.now(timezone)
                 clf_time = now_utc.strftime('[%d/%b/%Y:%H:%M:%S %z]')
                 line = f"{addr} - john {clf_time} {message} {size}"
@@ -109,7 +112,7 @@ def out_new_line(addr:str,
                 )
 
 # initialize server
-def start_server(lport=LPORT):
+def start_server(lhost:str=LHOST,lport:int=LPORT):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
@@ -125,10 +128,10 @@ def start_server(lport=LPORT):
     elif lport > 65535:
         logger.error("Port number must be lower than 65535")
         return
-    server.bind((LHOST, lport))
+    server.bind((lhost, lport))
     server.listen(5)
 
-    logger.info(f"\nTCP Server listening on {LHOST}:{lport}\n")
+    logger.info(f"\nTCP Server listening on {lhost}:{lport}\n")
 
     try:
         while True:
@@ -173,13 +176,13 @@ def terminal(args):
         logger.error(f"Invalid command. Available commands: {', '.join(commands.keys())}")
                 
 # working on it
-def send_command_to_client(client_socket, command):
+def send_command_to_client(client_socket, command,encoding:str=ENCODING):
     try:
-        client_socket.send(json.dumps(command).encode(ENCODING))
+        client_socket.send(json.dumps(command).encode(encoding))
     except Exception as e:
         logger.error(f"Failed to send command: {e}")
 
-def main_menu():
+def main_menu(prompt:str=PROMPT):
     print(r"""
     
     ___          ___    _  _____
@@ -203,7 +206,7 @@ Type 'exit' to quit the server.
                 while True:
                     # Terminal input loop
                     try:
-                        user_command = input(f"\n{PROMPT}")
+                        user_command = input(f"\n{prompt}")
                         if user_command == "back":
                             terminal("back")
                             break
