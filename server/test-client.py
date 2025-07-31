@@ -2,7 +2,7 @@ import socket
 import time
 from os import getenv
 from dotenv import load_dotenv
-
+from logger import get_logger
 load_dotenv()
 RHOST=str(getenv("RHOST","127.0.0.1"))
 RPORT=int(getenv("RPORT","1911"))
@@ -20,7 +20,8 @@ def test_client(rhost:str=RHOST,
                 rport:int=RPORT, 
                 messages=MESSAGES, 
                 delay:int=DELAY,
-                encoding:str=ENCODING):
+                encoding:str=ENCODING,
+                logger=get_logger()):
     if messages is None:
         messages = [
             "Hello, server!",
@@ -32,11 +33,11 @@ def test_client(rhost:str=RHOST,
     try:
         with socket.create_connection((rhost, rport)) as sock:
             for msg in messages:
-                print(f"Sending: {msg}")
-                sock.sendall(msg.encode(ENCODING))
+                logger.info(f"Sending: {msg}")
+                sock.sendall(msg.encode(encoding))
                 time.sleep(delay)
     except Exception as e:
-        print(f"Client error: {e}")
+        logger.error(f"Client error: {e}")
 
 if __name__ == "__main__":
     test_client()
