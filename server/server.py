@@ -7,6 +7,9 @@ import sys
 from datetime import datetime
 import pytz
 from logger import get_logger
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+import base64
 # TO DO LIST
 
 # generalize input handling
@@ -36,6 +39,7 @@ TO-DO
 """
 OUTPUT_TIMEZONE=str(getenv("OUTPUT_TIMEZONE","UTC"))
 PROMPT = getenv("PROMPT","$ ")
+PRIVATE_KEY_PATH=str(getenv("PRIVATE_KEY_PATH","private.pem"))
 
 
 logger.debug(f"LHOST={LHOST}")
@@ -44,9 +48,16 @@ logger.debug(f"RECV_SIZE={RECV_SIZE}")
 logger.debug(f"ENCODING={ENCODING}")
 logger.debug(f"OUT_FILE={OUT_FILE}")
 
+def get_rsa_chiper(private_key_path:str=PRIVATE_KEY_PATH):
+    with open(private_key_path, "rb") as f:
+        private_key = RSA.import_key(f.read())
+    cipher_rsa = PKCS1_OAEP.new(private_key)
+    return cipher_rsa
 
+rsa_chipher=get_rsa_chiper()
 # connection handler
 def handle_client(client_socket, addr):
+
     logger.info(f"\nConnection from {addr}")
     try:
         while True:
@@ -54,10 +65,12 @@ def handle_client(client_socket, addr):
             if not data:
                 break
             logger.debug(f"DATA SIZE = {len(data)}")
-            message = data.decode(ENCODING)
-
-            logger.info(f"\nReceived from {addr}: {message}\n")
-
+            try:
+                decrypted = rsa_chipher.decrypt(base64.b64decode(data))
+                message = decrypted.decode(ENCODING)
+                logger.info(f"\nReceived from {addr}: {message}\n")
+            except Exception as e:
+                logger.error(f"RSA decrypt error: {e}")
     except Exception as e:
         logger.error(f"Error with client {addr}: {e}")
     finally:
