@@ -7,6 +7,7 @@ import sys
 from datetime import datetime
 import pytz
 from logger import get_logger
+from generate_keys import generate_key_pair 
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import base64
@@ -50,10 +51,16 @@ logger.debug(f"OUT_FILE={OUT_FILE}")
 logger.debug(f"OUTPUT_TIMEZONE={OUTPUT_TIMEZONE}")
 
 def get_rsa_chiper(private_key_path:str=PRIVATE_KEY_PATH):
-    with open(private_key_path, "rb") as f:
-        private_key = RSA.import_key(f.read())
-    cipher_rsa = PKCS1_OAEP.new(private_key)
-    return cipher_rsa
+    try:
+        with open(private_key_path, "rb") as f:
+            private_key = RSA.import_key(f.read())
+        cipher_rsa = PKCS1_OAEP.new(private_key)
+        return cipher_rsa
+    except FileNotFoundError:
+        want_generate_keys=input(f"Could not found {private_key_path}, you want to generate a new key pair? [Y/n]")
+        if want_generate_keys.lower is "y" or want_generate_keys.strip() == "":
+            generate_key_pair()
+            get_rsa_chiper()
 
 rsa_chipher=get_rsa_chiper()
 # connection handler

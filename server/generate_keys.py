@@ -13,11 +13,12 @@ RSA_KEY_SIZE={RSA_KEY_SIZE}
 PRIVATE_KEY_PATH={getcwd()}/{PRIVATE_KEY_PATH}
 PUBLIC_KEY_PATH={getcwd()}/{PUBLIC_KEY_PATH}
 """)
+
 def generate_key_pair(
     rsa_key_size:int=RSA_KEY_SIZE,
     private_key_path:str=PRIVATE_KEY_PATH,
     public_key_path:str=PUBLIC_KEY_PATH
-):
+    ):
     key = RSA.generate(rsa_key_size)
 
     private_key = key.export_key()
