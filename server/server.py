@@ -2,7 +2,8 @@ from logging import log
 import socket
 import threading
 import json
-from os import getenv, getcwd
+from os import getenv, getcwd, environ
+from Crypto import PublicKey
 from dotenv import load_dotenv
 import sys
 from datetime import datetime
@@ -44,9 +45,7 @@ PROMPT = getenv("PROMPT","$ ")
 KEY_DIR=str(getenv("KEY_DIR",f"{getcwd()}/keys"))
 PRIVATE_KEY_PATH=str(getenv("PRIVATE_KEY_PATH",None))
 PUBLIC_KEY_PATH=str(getenv("PUBLIC_KEY_PATH",None))
-TLS_ENABLED=bool(getenv("TLS",
-                       PRIVATE_KEY_PATH and PUBLIC_KEY_PATH 
-                        ))
+TLS_ENABLED=getenv("TLS",False)
 
 logger.debug(f"LHOST={LHOST}")
 logger.debug(f"LPORT={LPORT}")
@@ -61,23 +60,28 @@ logger.debug(f"TLS={TLS_ENABLED}")
 
 def get_rsa_chiper(private_key_path:str=PRIVATE_KEY_PATH,key_dir:str=KEY_DIR):
     try:
+        logger.debug(f"Trying to open {key_dir}/{private_key_path}")
         with open(f"{key_dir}/{private_key_path}", "rb") as f:
             private_key = RSA.import_key(f.read())
         cipher_rsa = PKCS1_OAEP.new(private_key)
         return cipher_rsa
     except FileNotFoundError:
         want_generate_keys=input(f"Could not found {private_key_path}, you want to generate a new key pair? [Y/n]")
-        if want_generate_keys.lower == "y" or want_generate_keys.strip() == "":
-            generate_key_pair()
-            get_rsa_chiper()
+        if want_generate_keys.strip().lower() == "y" or want_generate_keys.strip() == "":
+            priv_key,_=generate_key_pair()
+            logger.info(f"""Restart the server with:
+            export PRIVATE_KEY_PATH={priv_key}
+            """)
+            exit(0)
 
-if TLS_ENABLED: rsa_chipher=get_rsa_chiper()
+
+if TLS_ENABLED!="False": rsa_chipher=get_rsa_chiper()
 
 # connection handler
 def handle_client(client_socket, 
                   addr,encoding:str=ENCODING,
                   recv_size:int=RECV_SIZE,
-                  tls_enabled:bool=TLS_ENABLED
+                  tls_enabled=TLS_ENABLED
                   ):
     logger.info(f"\nConnection from {addr}")
     try:
