@@ -1,12 +1,12 @@
 from Crypto.PublicKey import RSA
-from os import getenv, getcwd, environ
+from os import getenv, getcwd, environ,makedirs,path
 from dotenv import load_dotenv
 from logger import get_logger 
 
 logger=get_logger()
 load_dotenv()
 RSA_KEY_SIZE=int(getenv("RSA_KEY_SIZE",2048))
-PRIVATE_KEY_PATH=str(getenv("PRIVATE_KEY_NAME",None))
+PRIVATE_KEY_PATH=str(getenv("PRIVATE_KEY_PATH",None))
 PUBLIC_KEY_PATH=str(getenv("PUBLIC_KEY_PATH",None))
 KEY_DIR=str(getenv("KEY_DIR",f"{getcwd()}/keys"))
 logger.debug(f"""
@@ -23,13 +23,15 @@ def generate_key_pair(
     key_dir:str=KEY_DIR
     ):
     private_key_=private_key_path
+    logger.debug(f"private_key_={private_key_}")
     public_key_=public_key_path
-    if private_key_ is None:
+    logger.debug(f"public_key_={public_key_}")
+    if str(private_key_) == str(None):
         private_key_=str(input("Private key path [private.pem]:"))
         if private_key_.strip() == "":
             private_key_="private.pem"
     logger.debug(f"Private key file: {private_key_}")
-    if public_key_ is None:
+    if str(public_key_) == str(None):
         public_key_=str(input("Private key path [public.pem]:"))
         if public_key_.strip() == "":
             public_key_="public.pem"
@@ -45,6 +47,11 @@ def generate_key_pair(
     public_key = key.publickey().export_key()
     private_key_literal_path=f"{key_dir}/{private_key_}"
     public_key_literal_path=f"{key_dir}/{public_key_}"
+
+    if not path.exists(key_dir):
+        makedirs(key_dir)
+        logger.debug(f"{key_dir} created.")
+
     with open(private_key_literal_path, "wb") as f:
         logger.debug(f"Private key literal path: {private_key_literal_path}")
         f.write(private_key)
@@ -52,3 +59,4 @@ def generate_key_pair(
     with open(public_key_literal_path, "wb") as f:
         logger.debug(f"Public key literal path: {public_key_literal_path}")
         f.write(public_key)
+    return private_key_,public_key_ 
