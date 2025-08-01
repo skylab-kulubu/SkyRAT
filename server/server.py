@@ -1,7 +1,8 @@
+from logging import log
 import socket
 import threading
 import json
-from os import getenv
+from os import getenv, getcwd
 from dotenv import load_dotenv
 import sys
 from datetime import datetime
@@ -40,8 +41,12 @@ TO-DO
 """
 OUTPUT_TIMEZONE=str(getenv("OUTPUT_TIMEZONE","UTC"))
 PROMPT = getenv("PROMPT","$ ")
-PRIVATE_KEY_PATH=str(getenv("PRIVATE_KEY_PATH","private.pem"))
-
+KEY_DIR=str(getenv("KEY_DIR",f"{getcwd()}/keys"))
+PRIVATE_KEY_PATH=str(getenv("PRIVATE_KEY_PATH",None))
+PUBLIC_KEY_PATH=str(getenv("PUBLIC_KEY_PATH",None))
+TLS_ENABLED=bool(getenv("TLS",
+                       PRIVATE_KEY_PATH and PUBLIC_KEY_PATH 
+                        ))
 
 logger.debug(f"LHOST={LHOST}")
 logger.debug(f"LPORT={LPORT}")
@@ -49,10 +54,14 @@ logger.debug(f"RECV_SIZE={RECV_SIZE}")
 logger.debug(f"ENCODING={ENCODING}")
 logger.debug(f"OUT_FILE={OUT_FILE}")
 logger.debug(f"OUTPUT_TIMEZONE={OUTPUT_TIMEZONE}")
+logger.debug(f"KEY_DIR={KEY_DIR}")
+logger.debug(f"PRIVATE_KEY_PATH={PRIVATE_KEY_PATH}")
+logger.debug(f"PUBLIC_KEY_PATH={PUBLIC_KEY_PATH}")
+logger.debug(f"TLS={TLS_ENABLED}")
 
-def get_rsa_chiper(private_key_path:str=PRIVATE_KEY_PATH):
+def get_rsa_chiper(private_key_path:str=PRIVATE_KEY_PATH,key_dir:str=KEY_DIR):
     try:
-        with open(private_key_path, "rb") as f:
+        with open(f"{key_dir}/{private_key_path}", "rb") as f:
             private_key = RSA.import_key(f.read())
         cipher_rsa = PKCS1_OAEP.new(private_key)
         return cipher_rsa
@@ -62,23 +71,31 @@ def get_rsa_chiper(private_key_path:str=PRIVATE_KEY_PATH):
             generate_key_pair()
             get_rsa_chiper()
 
-rsa_chipher=get_rsa_chiper()
+if TLS_ENABLED: rsa_chipher=get_rsa_chiper()
+
 # connection handler
-def handle_client(client_socket, addr,encoding:str=ENCODING,recv_size:int=RECV_SIZE):
+def handle_client(client_socket, 
+                  addr,encoding:str=ENCODING,
+                  recv_size:int=RECV_SIZE,
+                  tls_enabled:bool=TLS_ENABLED
+                  ):
     logger.info(f"\nConnection from {addr}")
     try:
         while True:
+            message=None
             data = client_socket.recv(recv_size)
             if not data:
                 break
             logger.debug(f"DATA SIZE = {len(data)}")
-            try:
-                decrypted = rsa_chipher.decrypt(base64.b64decode(data))
-                message = decrypted.decode(encoding)
-                logger.info(f"\nReceived from {addr}: {message}\n")
-            except Exception as e:
-                logger.error(f"RSA decrypt error: {e}")
-
+            if tls_enabled:
+                try:
+                    decrypted = rsa_chipher.decrypt(base64.b64decode(data))
+                    message = decrypted.decode(encoding)
+                except Exception as e:
+                    logger.error(f"RSA decrypt error: {e}")
+            else:
+                message = data.decode(encoding)
+            logger.info(f"\nReceived from {addr}: {message}\n")
     except Exception as e:
         logger.error(f"Error with client {addr}: {e}")
     finally:

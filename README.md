@@ -62,7 +62,7 @@ podman build -t skyRAT-server .
 podman run --rm -it -p 4545:4545 \
 -e LHOST='0.0.0.0' \
 -e LPORT=4545 \
--v ./private.pem:/server/private.pem \
+-v ./keys:./keys \
 localhost/skyRAT-server
 ```
 
@@ -73,7 +73,7 @@ docker build -t skyRAT-server .
 docker run --rm -it -p 4545:4545 \
 -e LHOST='0.0.0.0' \
 -e LPORT=4545 \
--v ./private.pem:/server/private.pem \
+-v ./keys:./keys \
 skyRAT-server
 ```
 
