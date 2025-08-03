@@ -1,162 +1,83 @@
-// server.cpp
-// This program listens for a TCP connection. If a client sends the "screenshot" command,
-// it then receives the subsequent PNG file and saves it as "received_screenshot.png".
-
 #include <iostream>
 #include <fstream>
 #include <winsock2.h>
 #include <string>
-#include <vector>
+#include <windows.h>
 
-// Link the Winsock library (ws2_32.lib) for network functions.
-#pragma comment(lib, "ws2_32.lib") 
+#pragma comment(lib, "ws2_32.lib") // Link the Winsock library for networking
 
 using namespace std;
 
-const int PORT = 4444;            // The port on which the server will listen.
-const int BUFFER_SIZE = 4096;     // The size of the buffer used for receiving data.
+const int PORT = 12345; // Server port number to listen on
 
-/**
- * @brief A helper function to ensure all specified bytes are received from the socket.
- * TCP is a stream protocol, so a single send() call by the client might require
- * multiple recv() calls on the server to get all the data.
- * @param sock The client socket to receive data from.
- * @param buf The buffer to store the received data.
- * @param len The total number of bytes to receive.
- * @return The number of bytes received, or a negative value on error.
- */
-int recv_all(SOCKET sock, char* buf, int len) {
-    int total_received = 0;
-    while (total_received < len) {
-        // Receive data into the buffer at the correct offset.
-        int received = recv(sock, buf + total_received, len - total_received, 0);
-        if (received <= 0) {
-            // An error occurred or the connection was closed.
-            return received; 
-        }
-        total_received += received;
+// Receives a file from the client over the socket connection and saves it locally
+bool ReceiveFile(SOCKET sock, const char* filename) {
+    std::ofstream file(filename, std::ios::binary); // Open file in binary mode for writing
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file for writing: " << filename << std::endl;
+        return false;
     }
-    return total_received;
+
+    size_t filesize = 0;
+    // Receive the file size (first 8 bytes)
+    int received = recv(sock, (char*)&filesize, sizeof(filesize), 0);
+    if (received != sizeof(filesize)) {
+        std::cerr << "Failed to receive file size." << std::endl;
+        file.close();
+        return false;
+    }
+
+    size_t total = 0;
+    char buffer[1024];
+    // Continue receiving data until the entire file is received
+    while (total < filesize) {
+        int bytes = recv(sock, buffer, sizeof(buffer), 0);
+        if (bytes <= 0) break; // Connection closed or error
+        file.write(buffer, bytes); // Write received data to file
+        total += bytes;
+    }
+
+    file.close();
+    return total == filesize; // Return true if all bytes were received correctly
 }
 
-
 int main() {
-    // 1. INITIALIZE WINSOCK
-    WSADATA wsaData; // Structure to hold Winsock implementation details.
-    SOCKET listenSock, clientSock; // Sockets for listening and for the client connection.
-    sockaddr_in serverAddr = {}, clientAddr = {}; // Address structures for server and client.
+    WSADATA wsaData;
+    SOCKET listenSock, clientSock;
+    sockaddr_in serverAddr = {}, clientAddr = {};
     int clientAddrSize = sizeof(clientAddr);
 
-    cout << "Initializing Winsock..." << endl;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        cerr << "WSAStartup failed." << endl;
-        return -1;
-    }
+    WSAStartup(MAKEWORD(2, 2), &wsaData); // Initialize Winsock
+    listenSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // Create a TCP socket
 
-    // 2. CREATE A LISTENING SOCKET
-    cout << "Creating listening socket..." << endl;
-    listenSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // AF_INET = IPv4, SOCK_STREAM = TCP
-    if (listenSock == INVALID_SOCKET) {
-        cerr << "Socket creation failed." << endl;
-        WSACleanup(); // Clean up Winsock.
-        return -1;
-    }
+    // Set up server socket information
+    serverAddr.sin_family = AF_INET;             // IPv4
+    serverAddr.sin_addr.s_addr = INADDR_ANY;     // Listen on all interfaces
+    serverAddr.sin_port = htons(PORT);           // Port number in network byte order
 
-    // 3. BIND THE SOCKET TO AN IP ADDRESS AND PORT
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY; // Accept connections from any IP address.
-    serverAddr.sin_port = htons(PORT);       // Convert port number to network byte order.
+    bind(listenSock, (sockaddr*)&serverAddr, sizeof(serverAddr)); // Bind socket to IP/port
+    listen(listenSock, 1); // Start listening for 1 client connection
 
-    cout << "Binding socket to port " << PORT << "..." << endl;
-    if (bind(listenSock, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        cerr << "Bind failed." << endl;
-        closesocket(listenSock);
-        WSACleanup();
-        return -1;
-    }
+    cout << "Waiting for connection..." << endl;
+    clientSock = accept(listenSock, (sockaddr*)&clientAddr, &clientAddrSize); // Accept client connection
+    cout << "Client connected." << endl;
 
-    // 4. LISTEN FOR INCOMING CONNECTIONS
-    cout << "Listening for incoming connections..." << endl;
-    listen(listenSock, 1); // Listen, with a backlog of 1 pending connection.
+    // Send command to client
+    const char* command = "screenshot";
+    send(clientSock, command, strlen(command), 0); // Instruct client to take a screenshot
+    cout << "Command sent to client: " << command << endl;
 
-    // 5. ACCEPT A CLIENT CONNECTION
-    // This is a blocking call; the program will wait here until a client connects.
-    clientSock = accept(listenSock, (sockaddr*)&clientAddr, &clientAddrSize);
-    if (clientSock == INVALID_SOCKET) {
-        cerr << "Accept failed." << endl;
-        closesocket(listenSock);
-        WSACleanup();
-        return -1;
-    }
-    cout << "Client connection accepted." << endl;
-    
-    // The listening socket is no longer needed as we are only handling one client.
-    closesocket(listenSock); 
-
-    // 6. RECEIVE THE COMMAND FROM THE CLIENT
-    char cmdBuf[32] = {};
-    // Receive data, leaving one byte for the null terminator.
-    int cmdLen = recv(clientSock, cmdBuf, sizeof(cmdBuf) - 1, 0); 
-    if (cmdLen <= 0) {
-        cerr << "Could not receive command or connection was closed." << endl;
+    // Receive screenshot file from client
+    const char* filename = "client_screenshot.png";
+    if (ReceiveFile(clientSock, filename)) {
+        cout << "Screenshot received and saved as: " << filename << endl;
     } else {
-        string command(cmdBuf, cmdLen); // Convert the received buffer to a string.
-        cout << "Received command: " << command << endl;
-
-        // 7. IF COMMAND IS "screenshot", PROCEED WITH FILE RECEPTION
-        if (command == "screenshot") {
-            cout << "Waiting for file transfer..." << endl;
-            long long fileSize = 0;
-
-            // 7a. First, receive the file size (as a long long, 8 bytes).
-            // We use recv_all to ensure we get all 8 bytes reliably.
-            int received_size = recv_all(clientSock, (char*)&fileSize, sizeof(fileSize));
-
-            if (received_size != sizeof(fileSize)) {
-                cerr << "Error: Did not receive full file size. Received: " << received_size << " bytes." << endl;
-            } else {
-                cout << "Receiving file of size: " << fileSize << " bytes." << endl;
-                
-                // 7b. Open the output file in binary mode.
-                ofstream outFile("received_screenshot.png", ios::binary);
-                if (!outFile) {
-                    cerr << "Error: Could not create file received_screenshot.png." << endl;
-                } else {
-                    char buffer[BUFFER_SIZE];
-                    long long totalReceived = 0;
-                    
-                    // 7c. Loop until the entire file is received.
-                    while (totalReceived < fileSize) {
-                        // Calculate how many bytes to receive in this iteration.
-                        int bytesToReceive = min((long long)BUFFER_SIZE, fileSize - totalReceived);
-                        int bytes = recv(clientSock, buffer, bytesToReceive, 0);
-                        
-                        if (bytes <= 0) {
-                            cerr << "Connection lost while receiving file." << endl;
-                            break; // Exit the loop on error or disconnection.
-                        }
-                        
-                        outFile.write(buffer, bytes); // Write the received chunk to the file.
-                        totalReceived += bytes;
-                    }
-
-                    outFile.close(); // Close the file stream.
-
-                    if (totalReceived == fileSize) {
-                        cout << "File received successfully and saved as 'received_screenshot.png'." << endl;
-                    } else {
-                        cerr << "Error: File received is incomplete. Expected: " << fileSize << ", Received: " << totalReceived << endl;
-                    }
-                }
-            }
-        } else {
-            cout << "Unknown command: " << command << endl;
-        }
+        cout << "Error receiving the file!" << endl;
     }
 
-    // 8. CLEAN UP
-    cout << "Closing connection." << endl;
-    closesocket(clientSock); // Close the client socket.
-    WSACleanup();            // Terminate the use of the Winsock DLL.
+    // Clean up
+    closesocket(clientSock);   // Close client socket
+    closesocket(listenSock);   // Close server socket
+    WSACleanup();              // Clean up Winsock
     return 0;
 }
