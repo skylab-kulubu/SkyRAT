@@ -5,6 +5,8 @@ import logging
 load_dotenv()
 
 # Logging
+
+
 def get_logger():
     """
     Log Levels 
@@ -13,7 +15,7 @@ def get_logger():
         - WARNING
         - ERROR 
         - CRITICAL
-    
+
     Default Log Level = INFO
     """
     log_level_str = getenv("LOG_LEVEL", "INFO").upper()
@@ -25,8 +27,8 @@ def get_logger():
     if not logger.hasHandlers():
         console_handler = logging.StreamHandler()
         console_handler.setLevel(numeric_level)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
     return logger
-

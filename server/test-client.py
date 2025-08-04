@@ -8,12 +8,12 @@ from Crypto.Cipher import PKCS1_OAEP
 import base64
 
 load_dotenv()
-RHOST=str(getenv("RHOST","127.0.0.1"))
-RPORT=int(getenv("RPORT","1911"))
-MESSAGES=getenv("MESSAGES",None)
-DELAY=int(getenv("DELAY",1))
-ENCODING=str(getenv("ENCODING","utf-8"))
-PUBLIC_KEY_PATH=str(getenv("PUBLIC_KEY_PATH","public.pem"))
+RHOST = str(getenv("RHOST", "127.0.0.1"))
+RPORT = int(getenv("RPORT", "1911"))
+MESSAGES = getenv("MESSAGES", None)
+DELAY = int(getenv("DELAY", 1))
+ENCODING = str(getenv("ENCODING", "utf-8"))
+PUBLIC_KEY_PATH = str(getenv("PUBLIC_KEY_PATH", "public.pem"))
 """
 RHOST="127.0.0.1"
 RPORT=1911
@@ -21,7 +21,7 @@ MESSAGES="hello from world, omg its working, hi"
 DELAY=1
 ENCODING=utf-8
 """
-logger=get_logger()
+logger = get_logger()
 
 logger.debug(f"""
 RHOST={RHOST}
@@ -33,7 +33,8 @@ PUBLIC_KEY_PATH={PUBLIC_KEY_PATH}
 WORKING_DIRECTORY={getcwd()}
     """)
 
-def get_cipher_rsa(public_key_path:str=PUBLIC_KEY_PATH):
+
+def get_cipher_rsa(public_key_path: str = PUBLIC_KEY_PATH):
     with open(public_key_path, "rb") as f:
         content_bytes = f.read()
         logger.debug(f"""
@@ -44,13 +45,15 @@ def get_cipher_rsa(public_key_path:str=PUBLIC_KEY_PATH):
     cipher_rsa = PKCS1_OAEP.new(server_pub_key)
     return cipher_rsa
 
-cipher_rsa=get_cipher_rsa()
 
-def test_client(rhost:str=RHOST, 
-                rport:int=RPORT, 
-                messages=MESSAGES, 
-                delay:int=DELAY,
-                encoding:str=ENCODING,
+cipher_rsa = get_cipher_rsa()
+
+
+def test_client(rhost: str = RHOST,
+                rport: int = RPORT,
+                messages=MESSAGES,
+                delay: int = DELAY,
+                encoding: str = ENCODING,
                 logger=get_logger()):
     if messages is None:
         logger.debug("No MESSAGES provided")
@@ -73,6 +76,7 @@ def test_client(rhost:str=RHOST,
                 time.sleep(delay)
     except Exception as e:
         logger.error(f"Client error: {e}")
+
 
 if __name__ == "__main__":
     test_client()
