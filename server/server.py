@@ -1,9 +1,7 @@
-from logging import log
 import socket
 import threading
 import json
-from os import getenv, getcwd, environ
-from Crypto import PublicKey
+from os import getenv, getcwd
 from dotenv import load_dotenv
 import sys
 from datetime import datetime
@@ -13,6 +11,7 @@ from generate_keys import generate_key_pair
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import base64
+from agent import Agent
 # TO DO LIST
 
 # generalize input handling
@@ -46,6 +45,7 @@ KEY_DIR=str(getenv("KEY_DIR",f"{getcwd()}/keys"))
 PRIVATE_KEY_PATH=str(getenv("PRIVATE_KEY_PATH",None))
 PUBLIC_KEY_PATH=str(getenv("PUBLIC_KEY_PATH",None))
 TLS_ENABLED=getenv("TLS",False)
+AGENTS_JSON=getenv("AGENTS_JSON",f"{getcwd()}/agents.json")
 
 logger.debug(f"LHOST={LHOST}")
 logger.debug(f"LPORT={LPORT}")
@@ -81,9 +81,11 @@ if TLS_ENABLED!="False": rsa_chipher=get_rsa_chiper()
 def handle_client(client_socket, 
                   addr,encoding:str=ENCODING,
                   recv_size:int=RECV_SIZE,
-                  tls_enabled=TLS_ENABLED
+                  tls_enabled=TLS_ENABLED,
+                  agents_json:str=AGENTS_JSON
                   ):
     logger.info(f"\nConnection from {addr}")
+    agent = Agent(str(addr),["agent"],agents_json)
     try:
         while True:
             message=None
