@@ -218,14 +218,6 @@ def terminal(args):
         logger.error(
             f"Invalid command. Available commands: {', '.join(commands.keys())}")
 
-# working on it
-
-
-def send_command_to_client(client_socket, command, encoding: str = ENCODING):
-    try:
-        client_socket.send(json.dumps(command).encode(encoding))
-    except Exception as e:
-        logger.error(f"Failed to send command: {e}")
 
 
 def main_menu(prompt: str = PROMPT):
