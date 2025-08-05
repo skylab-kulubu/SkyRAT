@@ -9,7 +9,7 @@ from generate_keys import generate_key_pair
 from agent_tool import AgentTool
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
-from globals import LHOST, LPORT, RECV_SIZE, ENCODING, OUT_FILE, OUTPUT_TIMEZONE, KEY_DIR, PRIVATE_KEY_PATH, TLS_ENABLED, OUTPUT_FORMAT, PROMPT
+from globals import LHOST, LPORT, RECV_SIZE, ENCODING, OUT_FILE, OUTPUT_TIMEZONE, KEY_DIR, PRIVATE_KEY_NAME, TLS_ENABLED, OUTPUT_FORMAT, PROMPT
 # TO DO LIST
 
 # generalize input handling
@@ -31,11 +31,11 @@ logger.debug(f"ENCODING={ENCODING}")
 logger.debug(f"OUT_FILE={OUT_FILE}")
 logger.debug(f"OUTPUT_TIMEZONE={OUTPUT_TIMEZONE}")
 logger.debug(f"KEY_DIR={KEY_DIR}")
-logger.debug(f"PRIVATE_KEY_PATH={PRIVATE_KEY_PATH}")
+logger.debug(f"PRIVATE_KEY_NAME={PRIVATE_KEY_NAME}")
 logger.debug(f"TLS={TLS_ENABLED}")
 
 
-def get_rsa_chiper(private_key_path: str = PRIVATE_KEY_PATH, key_dir: str = KEY_DIR):
+def get_rsa_chiper(private_key_path: str = PRIVATE_KEY_NAME, key_dir: str = KEY_DIR):
     try:
         logger.debug(f"Trying to open {key_dir}/{private_key_path}")
         with open(f"{key_dir}/{private_key_path}", "rb") as f:
@@ -48,7 +48,7 @@ def get_rsa_chiper(private_key_path: str = PRIVATE_KEY_PATH, key_dir: str = KEY_
         if want_generate_keys.strip().lower() == "y" or want_generate_keys.strip() == "":
             priv_key, _ = generate_key_pair()
             logger.info(f"""Restart the server with:
-            export PRIVATE_KEY_PATH={priv_key}
+            export PRIVATE_KEY_NAME={priv_key}
             """)
             exit(0)
 
