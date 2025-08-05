@@ -63,6 +63,10 @@ class AgentTool:
                       ):
         logger.info(f"\nConnection from {addr}")
         agent = Agent(str(addr), ["agent"], agents_json)
+        
+        # Add agent to the agents dictionary
+        self.add_agent(agent, client_socket)
+        
         try:
             while True:
                 message = None
@@ -70,7 +74,7 @@ class AgentTool:
                 if not data:
                     break
                 logger.debug(f"DATA SIZE = {len(data)}")
-                if tls_enabled is not None:
+                if tls_enabled and tls_enabled != "False" and rsa_chipher is not None:
                     try:
                         decrypted = rsa_chipher.decrypt(base64.b64decode(data))
                         message = decrypted.decode(encoding)
@@ -82,5 +86,7 @@ class AgentTool:
         except Exception as e:
             logger.error(f"Error with client {addr}: {e}")
         finally:
+            # Remove agent from dictionary when connection closes
+            self.del_agent(agent)
             client_socket.close()
             logger.info(f"Connection with {addr} closed")
