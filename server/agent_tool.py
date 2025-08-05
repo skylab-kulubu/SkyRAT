@@ -1,11 +1,10 @@
-from Crypto.PublicKey import RSA
 from agent import Agent
 from socket import socket
 import base64
 from logger import get_logger
 from Crypto.Cipher import PKCS1_OAEP
 
-from server.globals import AGENTS_JSON, ENCODING, RECV_SIZE, TLS_ENABLED
+from globals import AGENTS_JSON, ENCODING, RECV_SIZE, TLS_ENABLED
 
 
 class AgentTool:

@@ -17,7 +17,8 @@ MESSAGES = getenv("MESSAGES", [
 ])
 DELAY = int(getenv("DELAY", 1))
 ENCODING = str(getenv("ENCODING", "utf-8"))
-PUBLIC_KEY_PATH = str(getenv("PUBLIC_KEY_PATH", "public.pem"))
+PUBLIC_KEY_NAME = str(getenv("PUBLIC_KEY_NAME", "public.pem"))
+KEY_DIR = str(getenv("KEY_DIR", f"{getcwd()}/keys"))
 """
 RHOST="127.0.0.1"
 RPORT=1911
@@ -33,13 +34,13 @@ RPORT={RPORT}
 MESSAGES={MESSAGES}
 DELAY={DELAY}
 ENCODING={ENCODING}
-PUBLIC_KEY_PATH={PUBLIC_KEY_PATH}
+PUBLIC_KEY_NAME={PUBLIC_KEY_NAME}
 WORKING_DIRECTORY={getcwd()}
     """)
 
 
-def get_cipher_rsa(public_key_path: str = PUBLIC_KEY_PATH):
-    with open(public_key_path, "rb") as f:
+def get_cipher_rsa(public_key_name: str = PUBLIC_KEY_NAME, key_dir: str = KEY_DIR):
+    with open(f"{key_dir}/{public_key_name}", "rb") as f:
         content_bytes = f.read()
         logger.debug(f"""
         RSA PUBLIC KEY 
