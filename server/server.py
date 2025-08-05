@@ -119,7 +119,7 @@ def start_server(lhost: str = LHOST, lport: int = LPORT):
         while True:
             client_socket, addr = server.accept()
             client_thread = threading.Thread(
-                target=agent_tool.handle_client, args=(client_socket, addr))
+                target=agent_tool.handle_client, args=(client_socket, addr,rsa_chipher))
             client_thread.daemon = True
             client_thread.start()
     except KeyboardInterrupt:

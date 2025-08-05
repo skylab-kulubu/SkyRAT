@@ -11,7 +11,7 @@ from server.globals import AGENTS_JSON, ENCODING, RECV_SIZE, TLS_ENABLED
 class AgentTool:
     """A class for agent utilties"""
 
-    def __init__(self, agents: dict = {}) -> None:
+    def __init__(self, agents: dict[str,socket] = {}) -> None:
         self.agents = agents
 
     def add_agent(self, agent: Agent, conn: socket):
@@ -54,10 +54,11 @@ class AgentTool:
 
     # connection handler
     def handle_client(self, client_socket: socket,
-                      rsa_chipher: PKCS1_OAEP.PKCS1OAEP_Cipher,
-                      addr, encoding: str = ENCODING,
+                      addr,
+                      rsa_chipher: PKCS1_OAEP.PKCS1OAEP_Cipher|None,
+                      encoding: str = ENCODING,
                       recv_size: int = RECV_SIZE,
-                      tls_enabled=TLS_ENABLED,
+                      tls_enabled:bool|str =  TLS_ENABLED,
                       agents_json: str = AGENTS_JSON,
                       logger=get_logger(),
                       ):
@@ -70,7 +71,7 @@ class AgentTool:
                 if not data:
                     break
                 logger.debug(f"DATA SIZE = {len(data)}")
-                if tls_enabled:
+                if tls_enabled is not None:
                     try:
                         decrypted = rsa_chipher.decrypt(base64.b64decode(data))
                         message = decrypted.decode(encoding)

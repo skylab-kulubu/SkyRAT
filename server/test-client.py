@@ -10,7 +10,11 @@ import base64
 load_dotenv()
 RHOST = str(getenv("RHOST", "127.0.0.1"))
 RPORT = int(getenv("RPORT", "1911"))
-MESSAGES = getenv("MESSAGES", None)
+MESSAGES = getenv("MESSAGES", [
+    "Hello, server!",
+    "This is a test message.",
+    "Goodbye!"
+])
 DELAY = int(getenv("DELAY", 1))
 ENCODING = str(getenv("ENCODING", "utf-8"))
 PUBLIC_KEY_PATH = str(getenv("PUBLIC_KEY_PATH", "public.pem"))
@@ -51,18 +55,11 @@ cipher_rsa = get_cipher_rsa()
 
 def test_client(rhost: str = RHOST,
                 rport: int = RPORT,
-                messages=MESSAGES,
+                messages: list[str] | str = MESSAGES,
                 delay: int = DELAY,
                 encoding: str = ENCODING,
                 logger=get_logger()):
-    if messages is None:
-        logger.debug("No MESSAGES provided")
-        messages = [
-            "Hello, server!",
-            "This is a test message.",
-            "Goodbye!"
-        ]
-    else:
+    if type(messages) == str:
         messages = messages.split(", ")
         logger.debug(f"messages={messages}")
     try:
