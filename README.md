@@ -66,8 +66,8 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 | `OUTPUT_TIMEZONE`  | `"UTC"`                    | Timezone used for timestamps in logs                               | `server.py`                                      |
 | `PROMPT`           | `"$ "`                     | Command prompt string shown to users                               | `server.py`                                      |
 | `KEY_DIR`          | `"{getcwd()}/keys"`        | Directory where key files are stored                               | `server.py`, `generate-key.py`                   |
-| `PRIVATE_KEY_PATH` | `None`                     | Path to the RSA private key file (optional override)               | `server.py`, `generate-key.py`                   |
-| `PUBLIC_KEY_PATH`  | `"public.pem"` or `None`   | Path to the RSA public key file (optional override)                | `server.py`, `generate-key.py`, `test-client.py` |
+| `PRIVATE_KEY_NAME` | `None`                     | Path to the RSA private key file (optional override)               | `server.py`, `generate-key.py`                   |
+| `PUBLIC_KEY_NAME`  | `"public.pem"` or `None`   | Path to the RSA public key file (optional override)                | `server.py`, `generate-key.py`, `test-client.py` |
 | `TLS_ENABLED`      | `False`                    | Flag indicating whether to enable TLS encryption                   | `server.py`                                      |
 | `AGENTS_JSON`      | `"{getcwd()}/agents.json"` | Path to JSON file storing agent metadata                           | `server.py`                                      |
 | `RSA_KEY_SIZE`     | `2048`                     | Bit length for the generated RSA key pair                          | `generate-key.py`                                |
@@ -85,7 +85,7 @@ podman build -t skyRAT-server .
 podman run --rm -it -p 4545:4545 \
 -e LHOST='0.0.0.0' \
 -e LPORT=4545 \
--e PRIVATE_KEY_PATH=keyname.key \
+-e PRIVATE_KEY_NAME=keyname.key \
 -e TLS=True \
 -v ./keys:./keys \
 localhost/skyRAT-server
@@ -98,7 +98,7 @@ docker build -t skyRAT-server .
 docker run --rm -it -p 4545:4545 \
 -e LHOST='0.0.0.0' \
 -e LPORT=4545 \
--e PRIVATE_KEY_PATH=keyname.key \
+-e PRIVATE_KEY_NAME=keyname.key \
 -e TLS=True \
 -v ./keys:./keys \
 skyRAT-server
