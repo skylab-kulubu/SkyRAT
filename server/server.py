@@ -1,17 +1,15 @@
 import socket
 import threading
-import json
-from os import getenv, getcwd
 from dotenv import load_dotenv
 import sys
 from datetime import datetime
 import pytz
 from logger import get_logger
 from generate_keys import generate_key_pair
+from agent_tool import AgentTool
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
-import base64
-from agent import Agent
+from globals import LHOST, LPORT, RECV_SIZE, ENCODING, OUT_FILE, OUTPUT_TIMEZONE, KEY_DIR, PRIVATE_KEY_PATH, TLS_ENABLED, OUTPUT_FORMAT, PROMPT
 # TO DO LIST
 
 # generalize input handling
@@ -22,32 +20,9 @@ from agent import Agent
 # send commands to the client side to start the modules
 
 logger = get_logger()
-
+agent_tool = AgentTool()
 # Load .env
 load_dotenv()
-LHOST = str(getenv("LHOST", "localhost"))
-LPORT = int(getenv("LPORT", "1911"))
-RECV_SIZE = int(getenv("RECV_SIZE", "1024"))
-ENCODING = str(getenv("ENCODING", "utf-8"))
-OUT_FILE = str(getenv("OUT_FILE", "output"))
-OUTPUT_FORMAT = str(getenv("OUTPUT_FORMAT", "CLF")
-                    )  # Options: CLF, JSON (to-do)
-"""
-CLF Log Format Sample
-192.168.122.16 - john [10/Oct/2000:13:55:36 -0700] "PRESS D" 768
-<src_addr> - <user or agent name> <time_stamp> <action> <bytes_sent>
-
-JSON Log Format Sample
-TO-DO
-"""
-
-OUTPUT_TIMEZONE=str(getenv("OUTPUT_TIMEZONE","UTC"))
-PROMPT = getenv("PROMPT","$ ")
-KEY_DIR=str(getenv("KEY_DIR",f"{getcwd()}/keys"))
-PRIVATE_KEY_PATH=str(getenv("PRIVATE_KEY_PATH",None))
-PUBLIC_KEY_PATH=str(getenv("PUBLIC_KEY_PATH",None))
-TLS_ENABLED=getenv("TLS",False)
-AGENTS_JSON=getenv("AGENTS_JSON",f"{getcwd()}/agents.json")
 
 logger.debug(f"LHOST={LHOST}")
 logger.debug(f"LPORT={LPORT}")
@@ -57,7 +32,6 @@ logger.debug(f"OUT_FILE={OUT_FILE}")
 logger.debug(f"OUTPUT_TIMEZONE={OUTPUT_TIMEZONE}")
 logger.debug(f"KEY_DIR={KEY_DIR}")
 logger.debug(f"PRIVATE_KEY_PATH={PRIVATE_KEY_PATH}")
-logger.debug(f"PUBLIC_KEY_PATH={PUBLIC_KEY_PATH}")
 logger.debug(f"TLS={TLS_ENABLED}")
 
 
@@ -81,37 +55,6 @@ def get_rsa_chiper(private_key_path: str = PRIVATE_KEY_PATH, key_dir: str = KEY_
 
 if TLS_ENABLED != "False":
     rsa_chipher = get_rsa_chiper()
-
-# connection handler
-def handle_client(client_socket, 
-                  addr,encoding:str=ENCODING,
-                  recv_size:int=RECV_SIZE,
-                  tls_enabled=TLS_ENABLED,
-                  agents_json:str=AGENTS_JSON
-                  ):
-    logger.info(f"\nConnection from {addr}")
-    agent = Agent(str(addr),["agent"],agents_json)
-    try:
-        while True:
-            message = None
-            data = client_socket.recv(recv_size)
-            if not data:
-                break
-            logger.debug(f"DATA SIZE = {len(data)}")
-            if tls_enabled:
-                try:
-                    decrypted = rsa_chipher.decrypt(base64.b64decode(data))
-                    message = decrypted.decode(encoding)
-                except Exception as e:
-                    logger.error(f"RSA decrypt error: {e}")
-            else:
-                message = data.decode(encoding)
-            logger.info(f"\nReceived from {addr}: {message}\n")
-    except Exception as e:
-        logger.error(f"Error with client {addr}: {e}")
-    finally:
-        client_socket.close()
-        logger.info(f"Connection with {addr} closed")
 
 
 def out_new_line(addr: str,
@@ -176,7 +119,7 @@ def start_server(lhost: str = LHOST, lport: int = LPORT):
         while True:
             client_socket, addr = server.accept()
             client_thread = threading.Thread(
-                target=handle_client, args=(client_socket, addr))
+                target=agent_tool.handle_client, args=(client_socket, addr))
             client_thread.daemon = True
             client_thread.start()
     except KeyboardInterrupt:
@@ -217,7 +160,6 @@ def terminal(args):
     else:
         logger.error(
             f"Invalid command. Available commands: {', '.join(commands.keys())}")
-
 
 
 def main_menu(prompt: str = PROMPT):
