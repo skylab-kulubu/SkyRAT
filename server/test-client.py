@@ -6,14 +6,20 @@ from logger import get_logger
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import base64
-
+import msgpack
 load_dotenv()
 RHOST = str(getenv("RHOST", "127.0.0.1"))
 RPORT = int(getenv("RPORT", "1911"))
 MESSAGES = getenv("MESSAGES", [
-    "Hello, server!",
-    "This is a test message.",
-    "Goodbye!"
+    {
+        "type": "plaintext",
+        "content": "test"
+    }
+    # },
+    # {
+    #     "type": "plaintext",
+    #     "content": "test2"
+    # }
 ])
 DELAY = int(getenv("DELAY", 1))
 ENCODING = str(getenv("ENCODING", "utf-8"))
@@ -56,7 +62,7 @@ cipher_rsa = get_cipher_rsa()
 
 def test_client(rhost: str = RHOST,
                 rport: int = RPORT,
-                messages: list[str] | str = MESSAGES,
+                messages: list|str = MESSAGES,
                 delay: int = DELAY,
                 encoding: str = ENCODING,
                 logger=get_logger()):
@@ -66,8 +72,9 @@ def test_client(rhost: str = RHOST,
     try:
         with socket.create_connection((rhost, rport)) as sock:
             for msg in messages:
+                msg = msgpack.dumps(messages)
                 logger.info(f"Sending: {msg}")
-                encrypted = cipher_rsa.encrypt(msg.encode(encoding))
+                encrypted = cipher_rsa.encrypt(msg)
                 logger.debug(f"encrypted={encrypted}")
                 sock.sendall(base64.b64encode(encrypted))
                 logger.debug(f"sended={base64.b64encode(encrypted)}")

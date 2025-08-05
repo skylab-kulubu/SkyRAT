@@ -3,6 +3,7 @@ from socket import socket
 import base64
 from logger import get_logger
 from Crypto.Cipher import PKCS1_OAEP
+import msgpack
 
 from globals import AGENTS_JSON, ENCODING, RECV_SIZE, TLS_ENABLED
 
@@ -77,12 +78,15 @@ class AgentTool:
                 if tls_enabled and tls_enabled != "False" and rsa_chipher is not None:
                     try:
                         decrypted = rsa_chipher.decrypt(base64.b64decode(data))
-                        message = decrypted.decode(encoding)
+                        logger.debug(f"decrypted={decrypted}")
+                        deserialized_data = msgpack.loads(decrypted)
+                        message = deserialized_data[0]["content"]
                     except Exception as e:
                         logger.error(f"RSA decrypt error: {e}")
                 else:
-                    message = data.decode(encoding)
-                logger.info(f"\nReceived from {addr}: {message}\n")
+                    deserialized_data = msgpack.loads(data)
+                    message = data[0]["content"]
+                logger.info(f"Received from {addr}: {message}\n")
         except Exception as e:
             logger.error(f"Error with client {addr}: {e}")
         finally:
