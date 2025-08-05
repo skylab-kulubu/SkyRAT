@@ -53,6 +53,29 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 - Desired commands and input rules will be defined.  
 - A **parsing algorithm** will be written to handle command processing.  
 
+### Enviroment Variables
+
+| Variable Name      | Default Value              | Description                                                        | Used In File(s)                                  |
+| ------------------ | -------------------------- | ------------------------------------------------------------------ | ------------------------------------------------ |
+| `LHOST`            | `"localhost"`              | IP address the server will bind to                                 | `server.py`                                      |
+| `LPORT`            | `"1911"`                   | Port number the server will listen on                              | `server.py`                                      |
+| `RECV_SIZE`        | `"1024"`                   | Buffer size in bytes for receiving data via socket                 | `server.py`                                      |
+| `ENCODING`         | `"utf-8"`                  | Character encoding used for socket communication                   | `server.py`, `test-client.py`                    |
+| `OUT_FILE`         | `"output"`                 | Filename where output logs will be written                         | `server.py`                                      |
+| `OUTPUT_FORMAT`    | `"CLF"`                    | Output log format (e.g., CLF = Common Log Format)                  | `server.py`                                      |
+| `OUTPUT_TIMEZONE`  | `"UTC"`                    | Timezone used for timestamps in logs                               | `server.py`                                      |
+| `PROMPT`           | `"$ "`                     | Command prompt string shown to users                               | `server.py`                                      |
+| `KEY_DIR`          | `"{getcwd()}/keys"`        | Directory where key files are stored                               | `server.py`, `generate-key.py`                   |
+| `PRIVATE_KEY_PATH` | `None`                     | Path to the RSA private key file (optional override)               | `server.py`, `generate-key.py`                   |
+| `PUBLIC_KEY_PATH`  | `"public.pem"` or `None`   | Path to the RSA public key file (optional override)                | `server.py`, `generate-key.py`, `test-client.py` |
+| `TLS_ENABLED`      | `False`                    | Flag indicating whether to enable TLS encryption                   | `server.py`                                      |
+| `AGENTS_JSON`      | `"{getcwd()}/agents.json"` | Path to JSON file storing agent metadata                           | `server.py`                                      |
+| `RSA_KEY_SIZE`     | `2048`                     | Bit length for the generated RSA key pair                          | `generate-key.py`                                |
+| `RHOST`            | `"127.0.0.1"`              | Remote host IP the client connects to                              | `test-client.py`                                 |
+| `RPORT`            | `"1911"`                   | Remote port the client connects to                                 | `test-client.py`                                 |
+| `MESSAGES`         | `None`                     | Optional pre-defined messages sent by the client (comma-separated) | `test-client.py`                                 |
+| `DELAY`            | `1`                        | Delay between messages sent by the client (in seconds)             | `test-client.py`                                 |
+
 ### Podman/Docker Quick Start
 
 #### Podman
