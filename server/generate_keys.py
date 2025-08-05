@@ -2,13 +2,9 @@ from Crypto.PublicKey import RSA
 from os import getenv, getcwd, environ, makedirs, path
 from dotenv import load_dotenv
 from logger import get_logger
-
+from globals import RSA_KEY_SIZE, PRIVATE_KEY_PATH, PUBLIC_KEY_PATH, KEY_DIR
 logger = get_logger()
 load_dotenv()
-RSA_KEY_SIZE = int(getenv("RSA_KEY_SIZE", 2048))
-PRIVATE_KEY_PATH = str(getenv("PRIVATE_KEY_PATH", None))
-PUBLIC_KEY_PATH = str(getenv("PUBLIC_KEY_PATH", None))
-KEY_DIR = str(getenv("KEY_DIR", f"{getcwd()}/keys"))
 logger.debug(f"""
 RSA_KEY_SIZE={RSA_KEY_SIZE}
 PRIVATE_KEY_PATH={PRIVATE_KEY_PATH}

@@ -2,7 +2,8 @@ import json
 import os
 from logger import get_logger
 
-logger=get_logger()
+logger = get_logger()
+
 
 class Agent:
     def __init__(self, addr: str,
@@ -32,9 +33,9 @@ class Agent:
         data.append(self.to_dict())
 
         if self.to_dict() in data:
-           logger.debug(f"{self.addr} already exists in agents.") 
+            logger.debug(f"{self.addr} already exists in agents.")
         else:
-            logger.info(f"{self.addr} doesn't exist in agents, adding it to JSON.")
+            logger.info(
+                f"{self.addr} doesn't exist in agents, adding it to JSON.")
             with open(self.json_file, 'w') as f:
                 json.dump(data, f, ensure_ascii=False)
-
