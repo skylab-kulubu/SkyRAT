@@ -1,9 +1,11 @@
+from typing import Any, dataclass_transform
 from agent import Agent
 from socket import socket
 import base64
 from logger import get_logger
 from Crypto.Cipher import PKCS1_OAEP
 import msgpack
+from typing import cast
 
 from globals import AGENTS_JSON, ENCODING, RECV_SIZE, TLS_ENABLED
 
@@ -43,14 +45,25 @@ class AgentTool:
         """
         pass
 
-    def send_msg(self, socket: socket, msg: str):
+    def send_str(self, socket: socket, msg: str):
         """Send message to an agent"""
         socket.sendall(msg.encode())
 
-    def send_msg_by_rhost(self, rhost: str, msg: str):
+    def send_str_by_rhost(self, rhost: str, msg: str):
         """Send message to an agent by remote addr"""
         socket = self.get_agent_by_rhost(rhost)
-        self.send_msg(socket, msg)
+        self.send_str(socket, msg)
+    
+    def send_bytes(self, socket: socket, data: bytes):
+        socket.sendall(data)
+
+    def request_screenshoot(self, socket: socket, agent: Agent):
+        request = {
+            "type": "screenshoot"
+        }
+        msg: bytes = cast(bytes,msgpack.dumps(request)) 
+        self.send_bytes(socket=socket,data=msg)
+
 
     # connection handler
     def handle_client(self, client_socket: socket,
