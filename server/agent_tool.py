@@ -16,19 +16,19 @@ class AgentTool:
     def __init__(self, agents: dict[str,socket] = {}) -> None:
         self.agents = agents
 
-    def add_agent(self, agent: Agent, conn: socket):
+    def add_agent(self, agent: Agent, conn: socket) -> None:
         """Add agent to agents dictionary object"""
         self.agents[agent.addr] = conn
 
-    def del_agent(self, agent: Agent):
+    def del_agent(self, agent: Agent) -> None:
         """Remove agent from agents dictionary object"""
         del self.agents[agent.addr]
 
-    def get_agents(self):
+    def get_agents(self) -> dict[str,socket]:
         """Remove agent object from agetns dictionary object"""
         return self.agents
 
-    def get_agent_by_rhost(self, rhost: str):
+    def get_agent_by_rhost(self, rhost: str) -> str:
         """Get agent by remote addr"""
         return self.agents[rhost]
 
@@ -45,19 +45,19 @@ class AgentTool:
         """
         pass
 
-    def send_str(self, socket: socket, msg: str):
+    def send_str(self, socket: socket, msg: str) -> None:
         """Send message to an agent"""
         socket.sendall(msg.encode())
 
-    def send_str_by_rhost(self, rhost: str, msg: str):
+    def send_str_by_rhost(self, rhost: str, msg: str) -> None:
         """Send message to an agent by remote addr"""
         socket = self.get_agent_by_rhost(rhost)
         self.send_str(socket, msg)
     
-    def send_bytes(self, socket: socket, data: bytes):
+    def send_bytes(self, socket: socket, data: bytes) -> None:
         socket.sendall(data)
 
-    def request_screenshoot(self, socket: socket, agent: Agent):
+    def request_screenshoot(self, socket: socket, agent: Agent) -> None:
         request = {
             "type": "screenshoot"
         }
@@ -74,7 +74,7 @@ class AgentTool:
                       tls_enabled:bool|str =  TLS_ENABLED,
                       agents_json: str = AGENTS_JSON,
                       logger=get_logger(),
-                      ):
+                      ) -> None:
         logger.info(f"\nConnection from {addr}")
         agent = Agent(str(addr), ["agent"], agents_json)
         
