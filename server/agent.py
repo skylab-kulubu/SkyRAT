@@ -1,27 +1,30 @@
 import json
 import os
 from logger import get_logger
-
+from socket import socket
 logger = get_logger()
 
 
 class Agent:
     def __init__(self, addr: str,
                  roles: list,
-                 json_file: str) -> None:
+                 json_file: str,
+                 socket: socket
+                 ) -> None:
         self.addr = addr
         self.roles = roles
         self.json_file = json_file
+        self.socket = socket
         self._save_to_json()
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         """Convert object to dictionary"""
         return {
             "addr": self.addr,
             "roles": self.roles
         }
 
-    def _save_to_json(self):
+    def _save_to_json(self) -> None:
         """Write object to JSON file"""
         data = []
         if os.path.exists(self.json_file):
