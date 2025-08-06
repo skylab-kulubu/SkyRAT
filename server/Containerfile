@@ -1,4 +1,4 @@
-FROM python:3.12-alpine
+FROM python:3.13-slim
 
 ARG LPORT=1911
 ARG WORKDIR=/server
