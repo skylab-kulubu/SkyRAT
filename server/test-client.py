@@ -13,7 +13,7 @@ RPORT = int(getenv("RPORT", "1911"))
 MESSAGES = getenv("MESSAGES", [
     {
         "type": "plaintext",
-        "content": "test"
+        "content": "HAHAHAHAH ÇALIŞIYOR "
     }
     # },
     # {

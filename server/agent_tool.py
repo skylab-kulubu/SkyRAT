@@ -10,6 +10,8 @@ from typing import cast
 from globals import AGENTS_JSON, ENCODING, RECV_SIZE, TLS_ENABLED
 
 logger = get_logger()
+
+
 class AgentTool:
     """A class for agent utilties"""
 
@@ -18,17 +20,17 @@ class AgentTool:
 
     def add_agent(self, agent: Agent) -> None:
         """Add agent to agents dictionary object"""
-        self.agents.append(agent) 
+        self.agents.append(agent)
 
     def del_agent(self, agent: Agent) -> None:
         """Remove agent from agents dictionary object"""
-        self.agents.remove(agent) 
+        self.agents.remove(agent)
 
     def get_agents(self) -> list[Agent]:
         """Remove agent object from agetns dictionary object"""
         return self.agents
 
-    def get_agent_by_rhost(self, rhost: str) -> Agent|None:
+    def get_agent_by_rhost(self, rhost: str) -> Agent | None:
         """Get agent by remote addr"""
         for agent in self.agents:
             if agent.addr == rhost:
@@ -57,10 +59,10 @@ class AgentTool:
         socket = self.get_agent_by_rhost(rhost)
         if socket is None:
             logger.info(f"No agents found with remote address {rhost}")
-            return 
+            return
         else:
             self.send_str(socket, msg)
-    
+
     def send_bytes(self, agent: Agent, data: bytes) -> None:
         socket = agent.socket
         socket.sendall(data)
@@ -69,26 +71,26 @@ class AgentTool:
         request = {
             "type": "screenshoot"
         }
-        msg: bytes = cast(bytes,msgpack.dumps(request)) 
-        self.send_bytes(agent=agent,data=msg)
-
+        msg: bytes = cast(bytes, msgpack.dumps(request))
+        self.send_bytes(agent=agent, data=msg)
 
     # connection handler
+
     def handle_client(self, client_socket: socket,
                       addr,
-                      rsa_chipher: PKCS1_OAEP.PKCS1OAEP_Cipher|None,
+                      rsa_chipher: PKCS1_OAEP.PKCS1OAEP_Cipher | None,
                       encoding: str = ENCODING,
                       recv_size: int = RECV_SIZE,
-                      tls_enabled:bool|str =  TLS_ENABLED,
+                      tls_enabled: bool | str = TLS_ENABLED,
                       agents_json: str = AGENTS_JSON,
                       logger=get_logger(),
                       ) -> None:
         logger.info(f"\nConnection from {addr}")
-        agent = Agent(str(addr), ["agent"], agents_json,socket=client_socket)
-        
+        agent = Agent(str(addr), ["agent"], agents_json, socket=client_socket)
+
         # Add agent to the agents dictionary
         self.add_agent(agent)
-        
+
         try:
             while True:
                 message: str = "None"
@@ -100,14 +102,15 @@ class AgentTool:
                     try:
                         decrypted = rsa_chipher.decrypt(base64.b64decode(data))
                         logger.debug(f"decrypted={decrypted}")
-                        deserialized_data: list = cast(list,msgpack.loads(decrypted))
+                        deserialized_data: list = cast(
+                            list, msgpack.loads(decrypted))
                         logger.debug(f"deserialized_data={deserialized_data}")
                         message_dict: dict = deserialized_data[0]
                         message: str = message_dict["content"]
                     except Exception as e:
                         logger.error(f"RSA decrypt error: {e}")
                 else:
-                    deserialized_data: list = cast(list,msgpack.loads(data))
+                    deserialized_data: list = cast(list, msgpack.loads(data))
                     message_dict: dict = deserialized_data[0]
                     message: str = message_dict["content"]
                 logger.info(f"Received from {addr}: {message}\n")
