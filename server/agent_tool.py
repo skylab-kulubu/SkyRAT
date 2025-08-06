@@ -1,4 +1,4 @@
-from typing import Any, dataclass_transform
+import typing
 from agent import Agent
 from socket import socket
 import base64
@@ -9,34 +9,36 @@ from typing import cast
 
 from globals import AGENTS_JSON, ENCODING, RECV_SIZE, TLS_ENABLED
 
-
+logger = get_logger()
 class AgentTool:
     """A class for agent utilties"""
 
-    def __init__(self, agents: dict[str,socket] = {}) -> None:
+    def __init__(self, agents: list[Agent] = []) -> None:
         self.agents = agents
 
-    def add_agent(self, agent: Agent, conn: socket) -> None:
+    def add_agent(self, agent: Agent) -> None:
         """Add agent to agents dictionary object"""
-        self.agents[agent.addr] = conn
+        self.agents.append(agent) 
 
     def del_agent(self, agent: Agent) -> None:
         """Remove agent from agents dictionary object"""
-        del self.agents[agent.addr]
+        self.agents.remove(agent) 
 
-    def get_agents(self) -> dict[str,socket]:
+    def get_agents(self) -> list[Agent]:
         """Remove agent object from agetns dictionary object"""
         return self.agents
 
-    def get_agent_by_rhost(self, rhost: str) -> str:
+    def get_agent_by_rhost(self, rhost: str) -> Agent|None:
         """Get agent by remote addr"""
-        return self.agents[rhost]
+        for agent in self.agents:
+            if agent.addr == rhost:
+                return agent
 
     def print_agents_table(self):
         """Agents table
         TO-DO
         """
-        for agent in self.agents.keys():
+        for agent in self.agents:
             print(agent)
 
     def broadcast_msg(self):
@@ -45,24 +47,30 @@ class AgentTool:
         """
         pass
 
-    def send_str(self, socket: socket, msg: str) -> None:
+    def send_str(self, agent: Agent, msg: str) -> None:
         """Send message to an agent"""
+        socket = agent.socket
         socket.sendall(msg.encode())
 
     def send_str_by_rhost(self, rhost: str, msg: str) -> None:
         """Send message to an agent by remote addr"""
         socket = self.get_agent_by_rhost(rhost)
-        self.send_str(socket, msg)
+        if socket is None:
+            logger.info(f"No agents found with remote address {rhost}")
+            return 
+        else:
+            self.send_str(socket, msg)
     
-    def send_bytes(self, socket: socket, data: bytes) -> None:
+    def send_bytes(self, agent: Agent, data: bytes) -> None:
+        socket = agent.socket
         socket.sendall(data)
 
-    def request_screenshoot(self, socket: socket, agent: Agent) -> None:
+    def request_screenshoot(self, agent: Agent) -> None:
         request = {
             "type": "screenshoot"
         }
         msg: bytes = cast(bytes,msgpack.dumps(request)) 
-        self.send_bytes(socket=socket,data=msg)
+        self.send_bytes(agent=agent,data=msg)
 
 
     # connection handler
@@ -76,14 +84,14 @@ class AgentTool:
                       logger=get_logger(),
                       ) -> None:
         logger.info(f"\nConnection from {addr}")
-        agent = Agent(str(addr), ["agent"], agents_json)
+        agent = Agent(str(addr), ["agent"], agents_json,socket=client_socket)
         
         # Add agent to the agents dictionary
-        self.add_agent(agent, client_socket)
+        self.add_agent(agent)
         
         try:
             while True:
-                message = None
+                message: str = "None"
                 data = client_socket.recv(recv_size)
                 if not data:
                     break
@@ -92,13 +100,16 @@ class AgentTool:
                     try:
                         decrypted = rsa_chipher.decrypt(base64.b64decode(data))
                         logger.debug(f"decrypted={decrypted}")
-                        deserialized_data = msgpack.loads(decrypted)
-                        message = deserialized_data[0]["content"]
+                        deserialized_data: list = cast(list,msgpack.loads(decrypted))
+                        logger.debug(f"deserialized_data={deserialized_data}")
+                        message_dict: dict = deserialized_data[0]
+                        message: str = message_dict["content"]
                     except Exception as e:
                         logger.error(f"RSA decrypt error: {e}")
                 else:
-                    deserialized_data = msgpack.loads(data)
-                    message = data[0]["content"]
+                    deserialized_data: list = cast(list,msgpack.loads(data))
+                    message_dict: dict = deserialized_data[0]
+                    message: str = message_dict["content"]
                 logger.info(f"Received from {addr}: {message}\n")
         except Exception as e:
             logger.error(f"Error with client {addr}: {e}")
