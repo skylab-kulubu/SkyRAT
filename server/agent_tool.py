@@ -79,7 +79,7 @@ class AgentTool:
 
     def request_screenshoot(self, agent: Agent) -> None:
         request = {"type": "screenshoot"}
-        msg: bytes = cast(bytes, msgpack.dumps(request))
+        msg = self.generate_msgpack_from_dict(request)
         self.send_bytes(agent=agent, data=msg)
 
     def add_role_to_agent(self, role: str, agent: Agent) -> list[str]:
