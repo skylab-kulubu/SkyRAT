@@ -43,11 +43,13 @@ class AgentTool:
         for agent in self.agents:
             print(agent)
 
-    def broadcast_msg(self):
-        """Send message to all agents
-        TO-DO
+    def broadcast_msg(self, data: bytes) -> None:
         """
-        pass
+        Send message to all agents
+        """
+        for agent in self.agents:
+            agent.socket.sendall(data)
+            logger.debug(f"Broadcast message sent to {agent.addr}")
 
     def send_str(self, agent: Agent, msg: str) -> None:
         """Send message to an agent"""
@@ -68,23 +70,23 @@ class AgentTool:
         socket.sendall(data)
 
     def request_screenshoot(self, agent: Agent) -> None:
-        request = {
-            "type": "screenshoot"
-        }
+        request = {"type": "screenshoot"}
         msg: bytes = cast(bytes, msgpack.dumps(request))
         self.send_bytes(agent=agent, data=msg)
 
     # connection handler
 
-    def handle_client(self, client_socket: socket,
-                      addr,
-                      rsa_chipher: PKCS1_OAEP.PKCS1OAEP_Cipher | None,
-                      encoding: str = ENCODING,
-                      recv_size: int = RECV_SIZE,
-                      tls_enabled: bool | str = TLS_ENABLED,
-                      agents_json: str = AGENTS_JSON,
-                      logger=get_logger(),
-                      ) -> None:
+    def handle_client(
+        self,
+        client_socket: socket,
+        addr,
+        rsa_chipher: PKCS1_OAEP.PKCS1OAEP_Cipher | None,
+        encoding: str = ENCODING,
+        recv_size: int = RECV_SIZE,
+        tls_enabled: bool | str = TLS_ENABLED,
+        agents_json: str = AGENTS_JSON,
+        logger=get_logger(),
+    ) -> None:
         logger.info(f"\nConnection from {addr}")
         agent = Agent(str(addr), ["agent"], agents_json, socket=client_socket)
 
@@ -102,8 +104,7 @@ class AgentTool:
                     try:
                         decrypted = rsa_chipher.decrypt(base64.b64decode(data))
                         logger.debug(f"decrypted={decrypted}")
-                        deserialized_data: list = cast(
-                            list, msgpack.loads(decrypted))
+                        deserialized_data: list = cast(list, msgpack.loads(decrypted))
                         logger.debug(f"deserialized_data={deserialized_data}")
                         message_dict: dict = deserialized_data[0]
                         message: str = message_dict["content"]
