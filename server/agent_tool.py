@@ -99,7 +99,6 @@ class AgentTool:
     def add_role_to_agent(self, role: str, agent: Agent) -> list[str]:
         if role not in agent.roles:
             agent.roles.append(role)
-            self.request_keystrokes(agent)
         else:
             logger.info(f"{role} is already assigned to {agent.addr}")
         return agent.roles
