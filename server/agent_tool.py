@@ -74,6 +74,9 @@ class AgentTool:
         socket = agent.socket
         socket.sendall(data)
 
+    def generate_msgpack_from_dict(self, dictionary: dict) -> bytes:
+        return cast(bytes, msgpack.dumps(dictionary))
+
     def request_screenshoot(self, agent: Agent) -> None:
         request = {"type": "screenshoot"}
         msg: bytes = cast(bytes, msgpack.dumps(request))
