@@ -37,11 +37,12 @@ class AgentTool:
                 return agent
 
     def print_agents_table(self):
-        """Agents table
-        TO-DO
         """
+        Agents table
+        """
+        i = 0
         for agent in self.agents:
-            print(agent)
+            print(f"{i} | {agent.addr}")
 
     def broadcast_msg(self, data: bytes) -> None:
         """
