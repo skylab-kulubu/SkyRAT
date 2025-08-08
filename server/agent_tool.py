@@ -1,4 +1,3 @@
-import typing
 from agent import Agent
 from socket import socket
 import base64
