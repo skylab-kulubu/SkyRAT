@@ -79,8 +79,14 @@ class AgentTool:
         msg: bytes = cast(bytes, msgpack.dumps(request))
         self.send_bytes(agent=agent, data=msg)
 
-    # connection handler
+    def add_role_to_agent(self, role: str, agent: Agent) -> list[str]:
+        if role not in agent.roles:
+            agent.roles.append(role)
+        else:
+            logger.info(f"{role} is already assigned to {agent.addr}")
+        return agent.roles
 
+    # connection handler
     def handle_client(
         self,
         client_socket: socket,
