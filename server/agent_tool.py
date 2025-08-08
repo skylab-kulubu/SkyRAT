@@ -36,6 +36,10 @@ class AgentTool:
             if agent.addr == rhost:
                 return agent
 
+    def get_agent_by_index(self, index: int) -> Agent:
+        """Return an agent with given index number"""
+        return self.agents[index]
+
     def print_agents_table(self):
         """
         Agents table
