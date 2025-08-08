@@ -71,13 +71,16 @@ class AgentTool:
             self.send_str(socket, msg)
 
     def send_bytes(self, agent: Agent, data: bytes) -> None:
+        """Send bytes to an agent"""
         socket = agent.socket
         socket.sendall(data)
 
     def generate_msgpack_from_dict(self, dictionary: dict) -> bytes:
+        """Gets dictionary and returns msgpack bytes"""
         return cast(bytes, msgpack.dumps(dictionary))
 
     def request_screenshoot(self, agent: Agent) -> None:
+        """Request screenshoot from a client"""
         request = {"type": "screenshoot"}
         msg = self.generate_msgpack_from_dict(request)
         self.send_bytes(agent=agent, data=msg)
