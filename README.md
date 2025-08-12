@@ -94,14 +94,14 @@ localhost/skyRAT-server
 #### Docker
 
 ```bash
-docker build -t skyRAT-server .
+docker build -t skyrat-server .
 docker run --rm -it -p 4545:4545 \
--e LHOST='0.0.0.0' \
--e LPORT=4545 \
--e PRIVATE_KEY_NAME=keyname.key \
--e TLS=True \
--v ./keys:./keys \
-skyRAT-server
+  -e LHOST=0.0.0.0 \
+  -e LPORT=4545 \
+  -e PRIVATE_KEY_NAME=keyname.key \
+  -e TLS=true \
+  -v "$(pwd)/keys:/keys" \
+  skyrat-server
 ```
 
 ---
