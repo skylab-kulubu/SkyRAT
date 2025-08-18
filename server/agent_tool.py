@@ -178,28 +178,45 @@ class AgentTool:
             'chunks_data': {}
         }
 
+        unpacker = msgpack.Unpacker(raw = False)
+
         try:
             while True:
-                message: str = "None"
+                ###message: str = "None"
                 data = client_socket.recv(recv_size)
                 if not data:
                     break
+
                 logger.debug(f"DATA SIZE = {len(data)}")
                 
                 try:
                     # Handle encrypted messages
                     if tls_enabled and tls_enabled != "False" and rsa_chipher is not None:
-                        message = self._handle_encrypted_message(data, rsa_chipher)
+                        ###message = self._handle_encrypted_message(data, rsa_chipher)
+
+                        # UNPACKER KULLANARAK TEKRAR YAZILDI USTTEKI KODLAR SILINEBILIR
+
+                        decrypted_data = rsa_chipher.decrypt(base64.b64decode(data))
+                        unpacker.feed(decrypted_data)
                     else:
                         # Handle unencrypted messages
-                        message = self._handle_unencrypted_message(data)
+                        ###message = self._handle_unencrypted_message(data)
+
+                        # UNPACKER KULLANARAK TEKRAR YAZILDI USTTEKI KODLAR SILINEBILIR
+
+                        unpacker.feed(data)
+
+                    # UNPACKER ILE DUZENLENDI
+                    for deserialized_data in unpacker:
+                        message_dict = deserialized_data[0]
+                        message = message_dict.get("content", "")
                     
                     # Process file transfer messages
-                    if self._is_file_transfer_message(message):
-                        self._handle_file_transfer_message(message, file_transfer_state, addr)
-                        continue
+                        if self._is_file_transfer_message(message):
+                            self._handle_file_transfer_message(message, file_transfer_state, addr)
+                            continue
                     
-                    logger.info(f"Received from {addr}: {message}\n")
+                        logger.info(f"Received from {addr}: {message}\n")
                     
                 except Exception as msgpack_error:
                     logger.error(f"Msgpack deserialization error: {msgpack_error}")
@@ -214,21 +231,28 @@ class AgentTool:
     def _handle_encrypted_message(self, data: bytes, rsa_chipher: PKCS1_OAEP.PKCS1OAEP_Cipher) -> str:
         """Handle encrypted message decryption and parsing."""
         try:
-            decrypted = rsa_chipher.decrypt(base64.b64decode(data))
-            logger.debug(f"decrypted={decrypted}")
-            deserialized_data: list = cast(list, msgpack.loads(decrypted))
-            logger.debug(f"deserialized_data={deserialized_data}")
-            message_dict: dict = deserialized_data[0]
-            return message_dict["content"]
+            ###decrypted = rsa_chipher.decrypt(base64.b64decode(data))
+            ###logger.debug(f"decrypted={decrypted}")
+            ###deserialized_data: list = cast(list, msgpack.loads(decrypted))
+            ###logger.debug(f"deserialized_data={deserialized_data}")
+            ###message_dict: dict = deserialized_data[0]
+            ###return message_dict["content"]
+
+            # UNPACKER KULLANARAK TEKRAR YAZILDI USTTEKI KODLAR SILINEBILIR
+            decrypted_data = rsa_chipher.decrypt(base64.b64decode(data))
+            return msgpack.loads(decrypted_data)
         except Exception as e:
             logger.error(f"RSA decrypt error: {e}")
             raise
 
     def _handle_unencrypted_message(self, data: bytes) -> str:
         """Handle unencrypted message parsing."""
-        deserialized_data: list = cast(list, msgpack.loads(data))
-        message_dict: dict = deserialized_data[0]
-        return message_dict["content"]
+        ###deserialized_data: list = cast(list, msgpack.loads(data))
+        ###message_dict: dict = deserialized_data[0]
+        ###return message_dict["content"]
+
+        # UNPACKER KULLANARAK TEKRAR YAZILDI USTTEKI KODLAR SILINEBILIR
+        return msgpack.loads(data)
 
     def _is_file_transfer_message(self, message: str) -> bool:
         """Check if message is related to file transfer."""

