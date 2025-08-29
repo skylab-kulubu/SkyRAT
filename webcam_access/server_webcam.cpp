@@ -4,12 +4,49 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <vector>
-#include <cstdint>
+#include <thread>
+#include <atomic>
 
 #pragma comment(lib, "ws2_32.lib")
 
+std::atomic<bool> running(true);
+
+void receiveFrames(SOCKET clientSock) {
+    while (running) {
+        uint32_t sizeNet;
+        int ret = recv(clientSock, (char*)&sizeNet, sizeof(sizeNet), 0);
+        if (ret <= 0) break;
+
+        uint32_t size = ntohl(sizeNet);
+        if (size == 0) continue;
+
+        std::vector<uchar> buf(size);
+        int received = 0;
+        while (received < (int)size) {
+            int n = recv(clientSock, reinterpret_cast<char*>(buf.data()) + received, size - received, 0);
+            if (n <= 0) {
+                received = -1;
+                break;
+            }
+            received += n;
+        }
+        if (received != (int)size) break;
+
+        cv::Mat img = cv::imdecode(buf, cv::IMREAD_COLOR);
+        if (!img.empty()) {
+            cv::imshow("Server - Gelen Goruntu", img);
+        }
+
+        if (cv::waitKey(1) == 'c') {
+            std::string closeCmd = "CLOSE_CAMERA";
+            send(clientSock, closeCmd.c_str(), closeCmd.size(), 0);
+            running = false;
+            break;
+        }
+    }
+}
+
 int main() {
-    // Winsock başlat
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
         std::cerr << "WSAStartup hatasi!\n";
@@ -56,44 +93,11 @@ int main() {
 
     std::cout << "Client baglandi.\n";
 
-    // Client'a komut gönder
     std::string cmd = "OPEN_CAMERA";
-    if (send(clientSock, cmd.c_str(), cmd.size(), 0) == SOCKET_ERROR) {
-        std::cerr << "Komut gonderilemedi!\n";
-        closesocket(clientSock);
-        closesocket(serverSock);
-        WSACleanup();
-        return 1;
-    }
+    send(clientSock, cmd.c_str(), cmd.size(), 0);
 
-    while (true) {
-        uint32_t sizeNet;
-        int ret = recv(clientSock, (char*)&sizeNet, sizeof(sizeNet), 0);
-        if (ret <= 0) break;
-
-        uint32_t size = ntohl(sizeNet);
-        if (size == 0) continue;
-
-        std::vector<uchar> buf(size);
-        int received = 0;
-        while (received < (int)size) {
-            int n = recv(clientSock, reinterpret_cast<char*>(buf.data()) + received, size - received, 0);
-            if (n <= 0) {
-                received = -1;
-                break;
-            }
-            received += n;
-        }
-        if (received != (int)size) break;
-
-        // JPEG -> OpenCV Mat
-        cv::Mat img = cv::imdecode(buf, cv::IMREAD_COLOR);
-        if (!img.empty()) {
-            cv::imshow("Server - Gelen Goruntu", img);
-        }
-
-        if (cv::waitKey(1) == 'q') break;
-    }
+    std::thread t(receiveFrames, clientSock);
+    t.join();
 
     closesocket(clientSock);
     closesocket(serverSock);
