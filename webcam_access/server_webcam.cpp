@@ -12,6 +12,9 @@
 std::atomic<bool> running(true);
 
 void receiveFrames(SOCKET clientSock) {
+    cv::VideoWriter writer;
+    bool recording = false;
+
     while (running) {
         uint32_t sizeNet;
         int ret = recv(clientSock, (char*)&sizeNet, sizeof(sizeNet), 0);
@@ -35,14 +38,42 @@ void receiveFrames(SOCKET clientSock) {
         cv::Mat img = cv::imdecode(buf, cv::IMREAD_COLOR);
         if (!img.empty()) {
             cv::imshow("Server - Gelen Goruntu", img);
+
+            // İlk frame geldiğinde VideoWriter aç
+            if (!recording) {
+                int fps = 20; // Yaklaşık FPS
+                std::string filename = "kayit.avi";
+                writer.open(filename,
+                            cv::VideoWriter::fourcc('X','V','I','D'),
+                            fps,
+                            img.size(),
+                            true);
+
+                if (!writer.isOpened()) {
+                    std::cerr << "VideoWriter acilamadi!\n";
+                } else {
+                    std::cout << "Kayit baslatildi: " << filename << std::endl;
+                    recording = true;
+                }
+            }
+
+            if (recording) {
+                writer.write(img);
+            }
         }
 
+        // 'c' tuşuna basınca kapatma komutu gönder
         if (cv::waitKey(1) == 'c') {
             std::string closeCmd = "CLOSE_CAMERA";
             send(clientSock, closeCmd.c_str(), closeCmd.size(), 0);
             running = false;
             break;
         }
+    }
+
+    if (recording) {
+        std::cout << "Kayit sonlandirildi.\n";
+        writer.release();
     }
 }
 
