@@ -1,0 +1,7 @@
+keys/
+__pycache_
+.env*
+Containerfile
+README.md
+test*.py
+.contanerignore

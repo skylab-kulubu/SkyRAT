@@ -3,6 +3,9 @@ FROM python:3.13-slim
 ARG LPORT=1911
 ARG WORKDIR=/server
 
+# Create a non-root user and group
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
 WORKDIR ${WORKDIR}
 
 ENV VIRTUAL_ENV=${WORKDIR}/venv
@@ -16,5 +19,7 @@ RUN python -m venv $VIRTUAL_ENV && \
 
 EXPOSE ${LPORT}
 
-CMD ["python", "server.py"]
+# Switch to the non-root user
+USER appuser
 
+CMD ["python", "server.py"]
