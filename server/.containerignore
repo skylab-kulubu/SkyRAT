@@ -5,3 +5,4 @@ Containerfile
 README.md
 test*.py
 .contanerignore
+.trivyignore
