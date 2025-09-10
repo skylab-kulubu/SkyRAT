@@ -4,6 +4,8 @@
 #include <windows.h>
 #include <fstream>
 #include <vector>
+#define MSGPACK_USE_BOOST 0
+#define MSGPACK_NO_BOOST 1
 #include <msgpack.hpp>
 
 class Keylogger_Module : public Module{

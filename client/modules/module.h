@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 #include <winsock2.h>
+#define MSGPACK_USE_BOOST 0
+#define MSGPACK_NO_BOOST 1
 #include <msgpack.hpp>
 
 class Module {

