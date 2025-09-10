@@ -76,24 +76,24 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 | `MESSAGES`         | `None`                     | Optional pre-defined messages sent by the client (comma-separated) | `test-client.py`                                 |
 | `DELAY`            | `1`                        | Delay between messages sent by the client (in seconds)             | `test-client.py`                                 |
 
-### Podman/Docker Quick Start
+### Docker/Docker Quick Start
 
-#### Podman
+#### Docker
 
 ##### Buillding From Source
 
 ```bash
-podman build --pull -t quay.io/skylab/skyrat-server:latest
+docker build --pull -t quay.io/skylab/skyrat-server:latest
 ```
 
 ##### Pulling Existing Image
 
 ```bash
-podman pull quay.io/skylab/skyrat-server:latest
+docker pull quay.io/skylab/skyrat-server:latest
 ```
 
 ```bash
-podman run --rm -it -p 4545:4545 \
+docker run --rm -it -p 4545:4545 \
 -e LHOST='0.0.0.0' \
 -e LPORT=4545 \
 -e PRIVATE_KEY_NAME=keyname.key \
