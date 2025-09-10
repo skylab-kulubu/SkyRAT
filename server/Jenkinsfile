@@ -1,0 +1,59 @@
+pipeline {
+  agent any
+  environment {
+    REPO_NAME = 'quay.io/skylab/skyrat-server'
+    QUAY_IO_CREDENTIAL_ID = '8cf59321-b03c-473e-93f1-db3196017ce2'
+    GIT_REPO = 'https://github.com/skylab-kulubu/SkyRAT.git'
+    BRANCH = 'main'
+    GIT_CREDENTIAL_ID = '00af65e1-7a22-49d2-8945-689779fc53b2'
+    TRIVY_SCANNERS = 'vuln,misconfig,secret'
+    TRIVY_SEVERITY = 'HIGH,CRITICAL'
+  }
+  stages {
+    stage('Checkout (username+password + path filter)') {
+      steps {
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: "*/${env.BRANCH}"]],
+          userRemoteConfigs: [[
+            url: "${env.GIT_REPO}",
+            credentialsId: "${env.GIT_CREDENTIAL_ID}"
+          ]],
+          extensions: [[
+            $class: 'PathRestriction',
+            includedRegions: 'server/.*'
+          ]]
+        ])
+      }
+    }
+    
+    stage('Trivy Reposityory Scan') {
+      steps {
+        sh "trivy repo $WORKSPACE --branch ${env.BRANCH} --ignore-unfixed --scanners ${env.TRIVY_SCANNERS} -s ${env.TRIVY_SEVERITY}"
+      }
+    }
+
+    stage('Build Image') {
+      steps {
+        dir('server'){
+            sh "sudo -n /usr/bin/buildah bud --no-cache --pull -t ${env.REPO_NAME}:${env.VERSION}"
+        }
+      }
+    }
+
+    stage('Push Image'){
+      steps {
+        withCredentials([string(credentialsId: "${env.QUAY_IO_CREDENTIAL_ID}", variable: 'QUAY_IO_CREDENTIAL')]) {
+          sh "sudo -n /usr/bin/buildah push --creds '$QUAY_IO_CREDENTIAL' ${env.REPO_NAME}:${env.VERSION}"
+        }   
+      }
+    }
+
+    stage('Scan Image') {
+        steps {
+            sh "trivy image --severity ${env.TRIVY_SEVERITY} --ignore-unfixed --scanners ${env.TRIVY_SCANNERS} ${env.REPO_NAME}:${env.VERSION}"
+        }
+    }
+    
+  }
+}
