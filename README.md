@@ -80,28 +80,26 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 
 #### Podman
 
+##### Buillding From Source
+
 ```bash
-podman build -t skyRAT-server .
+podman build --pull -t quay.io/skylab/skyrat-server:latest
+```
+
+##### Pulling Existing Image
+
+```bash
+podman pull quay.io/skylab/skyrat-server:latest
+```
+
+```bash
 podman run --rm -it -p 4545:4545 \
 -e LHOST='0.0.0.0' \
 -e LPORT=4545 \
 -e PRIVATE_KEY_NAME=keyname.key \
 -e TLS=True \
 -v ./keys:./keys \
-localhost/skyRAT-server
-```
-
-#### Docker
-
-```bash
-docker build -t skyrat-server .
-docker run --rm -it -p 4545:4545 \
-  -e LHOST=0.0.0.0 \
-  -e LPORT=4545 \
-  -e PRIVATE_KEY_NAME=keyname.key \
-  -e TLS=true \
-  -v "$(pwd)/keys:/keys" \
-  skyrat-server
+quay.io/skylab/skyrat-server:latest
 ```
 
 ---
