@@ -209,9 +209,15 @@ class AgentTool:
                     # UNPACKER ILE DUZENLENDI
                     for deserialized_data in unpacker:
                         message_dict = deserialized_data[0]
+                        
+                        if "type" in message_dict:
+                            self._handle_structured_message(message_dict, addr)
+                            continue
+                        
+                        # Handle legacy messages (old format)
                         message = message_dict.get("content", "")
                     
-                    # Process file transfer messages
+                        # Process file transfer messages
                         if self._is_file_transfer_message(message):
                             self._handle_file_transfer_message(message, file_transfer_state, addr)
                             continue
@@ -253,6 +259,216 @@ class AgentTool:
 
         # UNPACKER KULLANARAK TEKRAR YAZILDI USTTEKI KODLAR SILINEBILIR
         return msgpack.loads(data)
+
+    def _handle_structured_message(self, message_dict: dict, addr: tuple) -> None:
+        """Handle structured messages with different types."""
+        message_type = message_dict.get("type", "")
+        
+        if message_type == "screen_recording_start":
+            self._handle_screen_recording_start(message_dict, addr)
+        elif message_type == "screen_frame":
+            self._handle_screen_frame(message_dict, addr)
+        elif message_type == "screen_recording_end":
+            self._handle_screen_recording_end(message_dict, addr)
+        elif message_type == "file_transfer":
+            self._handle_single_file_transfer(message_dict, addr)
+        elif message_type == "file_chunk":
+            self._handle_structured_file_chunk(message_dict, addr)
+        else:
+            logger.warning(f"Unknown structured message type: {message_type} from {addr}")
+
+    def _handle_screen_recording_start(self, message_dict: dict, addr: tuple) -> None:
+        """Handle screen recording start message."""
+        duration = message_dict.get("duration", "unknown")
+        fps = message_dict.get("fps", "unknown")
+        width = message_dict.get("width", "unknown")
+        height = message_dict.get("height", "unknown")
+        
+        logger.info(f"Screen recording started from {addr}: {width}x{height} at {fps}fps for {duration}s")
+        
+        # Initialize screen recording session
+        if not hasattr(self, 'screen_recordings'):
+            self.screen_recordings = {}
+        
+        session_id = f"{addr[0]}_{addr[1]}_{datetime.now().timestamp()}"
+        self.screen_recordings[addr] = {
+            'session_id': session_id,
+            'duration': int(duration) if duration.isdigit() else 0,
+            'fps': int(fps) if fps.isdigit() else 30,
+            'width': int(width) if width.isdigit() else 0,
+            'height': int(height) if height.isdigit() else 0,
+            'frames': {},
+            'total_frames': 0,
+            'received_frames': 0
+        }
+
+    def _handle_screen_frame(self, message_dict: dict, addr: tuple) -> None:
+        """Handle individual screen recording frame."""
+        if not hasattr(self, 'screen_recordings') or addr not in self.screen_recordings:
+            logger.warning(f"Received frame from {addr} but no active recording session")
+            return
+        
+        frame_number = int(message_dict.get("frame_number", 0))
+        total_frames = int(message_dict.get("total_frames", 0))
+        frame_data = message_dict.get("frame_data", "")
+        
+        session = self.screen_recordings[addr]
+        session['total_frames'] = total_frames
+        session['frames'][frame_number] = frame_data
+        session['received_frames'] += 1
+        
+        # Log progress every 30 frames (1 second at 30fps)
+        if frame_number % 30 == 0:
+            logger.info(f"Screen recording progress from {addr}: frame {frame_number}/{total_frames}")
+
+    def _handle_screen_recording_end(self, message_dict: dict, addr: tuple) -> None:
+        """Handle screen recording end and create MP4 video."""
+        if not hasattr(self, 'screen_recordings') or addr not in self.screen_recordings:
+            logger.warning(f"Received recording end from {addr} but no active session")
+            return
+        
+        session = self.screen_recordings[addr]
+        self._create_video_from_frames(session, addr)
+        del self.screen_recordings[addr]
+
+    def _create_video_from_frames(self, session: dict, addr: tuple) -> None:
+        """Create MP4 video from collected frames."""
+        import os
+        import tempfile
+        import shutil
+        import ffmpeg
+        
+        session_id = session['session_id']
+        fps = session['fps']
+        frames = session['frames']
+        
+        logger.info(f"Creating video from {len(frames)} frames for session {session_id}")
+        
+        # Use system temporary directory with proper permissions
+        temp_dir = None
+        try:
+            temp_dir = tempfile.mkdtemp(prefix=f"screen_recording_{session_id}_")
+            logger.debug(f"Created temporary directory: {temp_dir}")
+            
+            # Save frames as PNG files
+            for frame_num in sorted(frames.keys()):
+                frame_data = frames[frame_num]
+                frame_bytes = base64.b64decode(frame_data)
+                frame_filename = os.path.join(temp_dir, f"frame{frame_num:04d}.png")
+                
+                with open(frame_filename, 'wb') as f:
+                    f.write(frame_bytes)
+            
+            # Create MP4 using ffmpeg-python
+            output_filename = f"screen_recording_{addr[0]}_{session_id}.mp4"
+            input_pattern = os.path.join(temp_dir, "frame%04d.png")
+            
+            logger.debug(f"Creating video: {output_filename}")
+            
+            (
+                ffmpeg
+                .input(input_pattern, framerate=fps)
+                .output(output_filename, vcodec='libx264', pix_fmt='yuv420p')
+                .overwrite_output()
+                .run(capture_stdout=True, capture_stderr=True)
+            )
+            
+            logger.info(f"Video created successfully: {output_filename}")
+                
+        except ffmpeg.Error as e:
+            logger.error(f"FFmpeg error: {e.stderr.decode() if e.stderr else 'Unknown ffmpeg error'}")
+        except PermissionError as pe:
+            logger.error(f"Permission error creating video: {pe}")
+        except Exception as e:
+            logger.error(f"Error creating video: {e}")
+        finally:
+            # Clean up temporary directory
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir)
+                    logger.debug(f"Cleaned up temporary directory: {temp_dir}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to cleanup temporary directory {temp_dir}: {cleanup_error}")
+
+    def _handle_single_file_transfer(self, message_dict: dict, addr: tuple) -> None:
+        """Handle single file transfer message."""
+        filename = message_dict.get("filename", "unknown_file")
+        filedata = message_dict.get("filedata", "")
+        
+        try:
+            file_bytes = base64.b64decode(filedata)
+            output_filename = f"{addr[0]}_{filename}"
+            
+            with open(output_filename, 'wb') as f:
+                f.write(file_bytes)
+            
+            logger.info(f"File received and saved: {output_filename} ({len(file_bytes)} bytes)")
+            
+        except Exception as e:
+            logger.error(f"Error saving file: {e}")
+
+    def _handle_structured_file_chunk(self, message_dict: dict, addr: tuple) -> None:
+        """Handle structured file chunk messages."""
+        chunk_type = message_dict.get("chunk_type", "")
+        
+        if chunk_type == "start":
+            # Initialize file transfer state for this address
+            if not hasattr(self, 'file_transfers'):
+                self.file_transfers = {}
+            
+            filename = message_dict.get("filename", "")
+            total_size = int(message_dict.get("total_size", 0))
+            total_chunks = int(message_dict.get("total_chunks", 0))
+            
+            self.file_transfers[addr] = {
+                'filename': filename,
+                'total_size': total_size,
+                'total_chunks': total_chunks,
+                'chunks': {}
+            }
+            logger.info(f"File transfer started: {filename} ({total_size} bytes, {total_chunks} chunks)")
+            
+        elif chunk_type == "data":
+            if hasattr(self, 'file_transfers') and addr in self.file_transfers:
+                chunk_number = int(message_dict.get("chunk_number", 0))
+                chunk_data = message_dict.get("chunk_data", "")
+                
+                self.file_transfers[addr]['chunks'][chunk_number] = chunk_data
+                
+                # Log progress
+                received_chunks = len(self.file_transfers[addr]['chunks'])
+                total_chunks = self.file_transfers[addr]['total_chunks']
+                if received_chunks % 10 == 0:
+                    logger.info(f"File transfer progress: {received_chunks}/{total_chunks} chunks")
+            
+        elif chunk_type == "end":
+            if hasattr(self, 'file_transfers') and addr in self.file_transfers:
+                self._reconstruct_chunked_file(addr)
+                del self.file_transfers[addr]
+
+    def _reconstruct_chunked_file(self, addr: tuple) -> None:
+        """Reconstruct file from chunks."""
+        transfer_info = self.file_transfers[addr]
+        filename = transfer_info['filename']
+        chunks = transfer_info['chunks']
+        total_chunks = transfer_info['total_chunks']
+        
+        # Reconstruct file data
+        full_data = bytearray()
+        for i in range(total_chunks):
+            if i in chunks:
+                chunk_bytes = base64.b64decode(chunks[i])
+                full_data.extend(chunk_bytes)
+            else:
+                logger.error(f"Missing chunk {i} for file {filename}")
+                return
+        
+        # Save file
+        output_filename = f"{addr[0]}_{filename}"
+        with open(output_filename, 'wb') as f:
+            f.write(full_data)
+        
+        logger.info(f"Chunked file reconstructed: {output_filename} ({len(full_data)} bytes)")
 
     def _is_file_transfer_message(self, message: str) -> bool:
         """Check if message is related to file transfer."""

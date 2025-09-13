@@ -17,6 +17,9 @@ RUN python -m venv $VIRTUAL_ENV && \
   pip install --upgrade pip && \
   pip install --no-cache-dir -r requirement.txt
 
+# Change ownership of the working directory to writeable by appuser
+RUN chown -R appuser:appgroup ${WORKDIR}
+
 EXPOSE ${LPORT}
 
 # Switch to the non-root user
