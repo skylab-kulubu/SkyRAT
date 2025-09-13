@@ -6,6 +6,7 @@
 #include <msgpack.hpp>
 #include <thread>
 #include <chrono>
+#include <map>
 
 // Function to send a file over socket using msgpack protocol
 bool Module::sendFileViaMsgPack(SOCKET sock, const char* fileName){
@@ -32,20 +33,28 @@ bool Module::sendFileViaMsgPack(SOCKET sock, const char* fileName){
         std::string base64_data = base64_encode(filedata);
 
         // Send file as a single message
-        std::string file_message =  std::string(name()) + "_DATA:" + base64_data;
-        return send_message(sock, file_message);
+        std::map<std::string, std::string> msg_data;
+        msg_data["type"] = "file_transfer";
+        msg_data["filename"] = fileName;
+        msg_data["filedata"] = base64_data;
+        return send_message(sock, msg_data);
 }
 
 // Function to send file in chunks for large files
 bool Module::sendFileInChunks(SOCKET sock, const char* filename, const std::vector<char>& filedata){
-    const size_t chunk_size = 512; // 512 bytes chunks to stay well under msgpack 1024 limit
+    const size_t chunk_size = 32 * 1024; // 32KB chunks
     size_t total_chunks = (filedata.size() + chunk_size - 1) / chunk_size;
     
     std::cout << "[Info] Sending file in " << total_chunks << " chunks of " << chunk_size << " bytes each" << std::endl;
     
     // Send file header
-    std::string header = "FILE_START:" + std::string(filename) + ":" + std::to_string(filedata.size()) + ":" + std::to_string(total_chunks);
-    if (!send_message(sock, header)) return false;
+    std::map<std::string, std::string> header_data;
+    header_data["type"] = "file_chunk";
+    header_data["chunk_type"] = "start";
+    header_data["filename"] = filename;
+    header_data["total_size"] = std::to_string(filedata.size());
+    header_data["total_chunks"] = std::to_string(total_chunks);
+    if (!send_message(sock, header_data)) return false;
     
     // Send chunks
     for (size_t i = 0; i < total_chunks; ++i) {
@@ -55,26 +64,34 @@ bool Module::sendFileInChunks(SOCKET sock, const char* filename, const std::vect
         std::vector<char> chunk(filedata.begin() + start, filedata.begin() + end);
         std::string base64_chunk = base64_encode(chunk);
         
-        std::string chunk_message = "FILE_CHUNK:" + std::to_string(i) + ":" + base64_chunk;
-        if (!send_message(sock, chunk_message)) {
+        std::map<std::string, std::string> chunk_data;
+        chunk_data["type"] = "file_chunk";
+        chunk_data["chunk_type"] = "data";
+        chunk_data["chunk_number"] = std::to_string(i);
+        chunk_data["chunk_data"] = base64_chunk;
+
+        if (!send_message(sock, chunk_data)) {
             std::cerr << "[Error] Failed to send chunk " << i << "/" << total_chunks << std::endl;
             return false;
         }
         
-        // Show progress every 50 chunks
-        if (i % 50 == 0 || i == total_chunks - 1) {
+        // Show progress every 10 chunks
+        if (i % 10 == 0 || i == total_chunks - 1) {
             std::cout << "[Progress] Sent chunk " << (i + 1) << "/" << total_chunks << std::endl;
         }
         
         // Small delay between chunks to avoid overwhelming the connection
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     
     std::cout << "[Success] File transfer completed - " << total_chunks << " chunks sent" << std::endl;
     
     // Send file end marker
-    std::string end_message = "FILE_END:" + std::string(filename);
-    return send_message(sock, end_message);
+    std::map<std::string, std::string> end_data;
+    end_data["type"] = "file_chunk";
+    end_data["chunk_type"] = "end";
+    end_data["filename"] = filename;
+    return send_message(sock, end_data);
 }
 
 // Simple base64 encoding function
@@ -103,6 +120,11 @@ std::string Module::base64_encode(const std::vector<char>& data){
 // Send message over socket using server's expected format
 bool Module::send_message(SOCKET sock, const std::string& msg){
     std::vector<char> formatted_msg = create_message(msg);
+    return send(sock, formatted_msg.data(), static_cast<int>(formatted_msg.size()), 0) != SOCKET_ERROR;
+}
+
+bool Module::send_message(SOCKET sock, const std::map<std::string, std::string>& data) {
+    std::vector<char> formatted_msg = create_message(data);
     return send(sock, formatted_msg.data(), static_cast<int>(formatted_msg.size()), 0) != SOCKET_ERROR;
 }
 
@@ -141,5 +163,24 @@ std::vector<char> Module::create_message(const std::string& content) {
         result.insert(result.end(), content.begin(), content.end());
     }
     
+    return result;
+}
+
+std::vector<char> Module::create_message(const std::map<std::string, std::string>& data) {
+    msgpack::sbuffer sbuf;
+    msgpack::packer<msgpack::sbuffer> packer(&sbuf);
+
+    // Main array with one element
+    packer.pack_array(1);
+
+    // Map with dynamic number of key-value pairs
+    packer.pack_map(data.size());
+
+    for (const auto& pair : data) {
+        packer.pack(pair.first);
+        packer.pack(pair.second);
+    }
+
+    std::vector<char> result(sbuf.data(), sbuf.data() + sbuf.size());
     return result;
 }

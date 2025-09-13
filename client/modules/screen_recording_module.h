@@ -6,6 +6,9 @@
 #include <atomic>
 #include <thread>
 #include <cstdint>
+#define MSGPACK_USE_BOOST 0
+#define MSGPACK_NO_BOOST 1
+#include <msgpack.hpp>
 
 #pragma comment(lib, "Gdiplus.lib")
 
@@ -30,7 +33,8 @@ private:
     void InitializeGDIPlus();
     void ShutdownGDIPlus();
     bool CaptureScreenToMemory(std::vector<uint8_t>& pngData);
-    bool SendFrame(SOCKET sock, const std::vector<uint8_t>& data);
-    bool SendAll(SOCKET sock, const char* data, int size);
+    bool SendFrame(SOCKET sock, const std::vector<uint8_t>& data, int frameNumber, int totalFrames);
+    bool SendStreamStart(SOCKET sock, int durationSeconds, int fps, int width, int height);
+    bool SendStreamEnd(SOCKET sock);
     void recordingLoop(SOCKET sock, int durationSeconds, int fps);
 };

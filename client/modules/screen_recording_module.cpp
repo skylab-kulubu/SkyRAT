@@ -91,35 +91,35 @@ bool ScreenRecording_Module::CaptureScreenToMemory(std::vector<uint8_t>& pngData
     return true;
 }
 
-bool ScreenRecording_Module::SendAll(SOCKET sock, const char* data, int size) {
-    int totalSent = 0;
-    while (totalSent < size) {
-        int sent = send(sock, data + totalSent, size - totalSent, 0);
-        if (sent <= 0) {
-            std::cerr << "[ERROR] send() basarisiz! sent=" << sent << "\n";
-            return false;
-        }
-        totalSent += sent;
-    }
-    return true;
+bool ScreenRecording_Module::SendStreamStart(SOCKET sock, int durationSeconds, int fps, int width, int height) {
+    std::map<std::string, std::string> data;
+    data["type"] = "screen_recording_start";
+    data["duration"] = std::to_string(durationSeconds);
+    data["fps"] = std::to_string(fps);
+    data["width"] = std::to_string(width);
+    data["height"] = std::to_string(height);
+    
+    return send_message(sock, data);
 }
 
-bool ScreenRecording_Module::SendFrame(SOCKET sock, const std::vector<uint8_t>& data) {
-    uint32_t size = (uint32_t)data.size();
+bool ScreenRecording_Module::SendStreamEnd(SOCKET sock) {
+    std::map<std::string, std::string> data;
+    data["type"] = "screen_recording_end";
+    
+    return send_message(sock, data);
+}
 
-    // Boyutu gönder
-    if (!SendAll(sock, (char*)&size, sizeof(size))) {
-        std::cerr << "[ERROR] Boyut gonderilemedi.\n";
-        return false;
-    }
-
-    // Veriyi gönder
-    if (!SendAll(sock, (const char*)data.data(), size)) {
-        std::cerr << "[ERROR] Veri gonderilemedi.\n";
-        return false;
-    }
-
-    return true;
+bool ScreenRecording_Module::SendFrame(SOCKET sock, const std::vector<uint8_t>& pngData, int frameNumber, int totalFrames) {
+    std::vector<char> charData(pngData.begin(), pngData.end());
+    std::string base64Data = base64_encode(charData);
+    
+    std::map<std::string, std::string> data;
+    data["type"] = "screen_frame";
+    data["frame_number"] = std::to_string(frameNumber);
+    data["total_frames"] = std::to_string(totalFrames);
+    data["frame_data"] = base64Data;
+    
+    return send_message(sock, data);
 }
 
 bool ScreenRecording_Module::startRecording(SOCKET sock, int durationSeconds, int fps) {
@@ -155,6 +155,17 @@ void ScreenRecording_Module::recordingLoop(SOCKET sock, int durationSeconds, int
     int frameDelay = 1000 / fps; // milliseconds between frames
     int totalFrames = durationSeconds * fps;
     
+    // Get screen dimensions
+    int width = GetSystemMetrics(SM_CXSCREEN);
+    int height = GetSystemMetrics(SM_CYSCREEN);
+    
+    // Send stream start message
+    if (!SendStreamStart(sock, durationSeconds, fps, width, height)) {
+        std::cerr << "[ERROR] Failed to send stream start message" << std::endl;
+        recording = false;
+        return;
+    }
+    
     auto startTime = std::chrono::steady_clock::now();
     
     for (int frameNum = 0; frameNum < totalFrames && recording.load(); ++frameNum) {
@@ -166,7 +177,7 @@ void ScreenRecording_Module::recordingLoop(SOCKET sock, int durationSeconds, int
             break;
         }
 
-        if (!SendFrame(sock, pngData)) {
+        if (!SendFrame(sock, pngData, frameNum, totalFrames)) {
             std::cerr << "[ERROR] Frame gönderme hatasi! Frame: " << frameNum << "\n";
             break;
         }
@@ -183,6 +194,11 @@ void ScreenRecording_Module::recordingLoop(SOCKET sock, int durationSeconds, int
         if (frameNum % fps == 0) { // Every second
             std::cout << "[ScreenRecording] Recorded " << (frameNum / fps) << " seconds" << std::endl;
         }
+    }
+    
+    // Send stream end message
+    if (!SendStreamEnd(sock)) {
+        std::cerr << "[ERROR] Failed to send stream end message" << std::endl;
     }
     
     auto endTime = std::chrono::steady_clock::now();
