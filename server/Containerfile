@@ -6,6 +6,8 @@ ARG WORKDIR=/server
 # Create a non-root user and group
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+
 WORKDIR ${WORKDIR}
 
 ENV VIRTUAL_ENV=${WORKDIR}/venv

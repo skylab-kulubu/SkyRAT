@@ -4,9 +4,13 @@ import msgpack
 from datetime import datetime
 from socket import socket
 from typing import cast
+import os
+import tempfile
+import shutil
 
 # Third-party imports
 from Crypto.Cipher import PKCS1_OAEP
+import ffmpeg
 
 # Local imports
 from agent import Agent
@@ -285,6 +289,7 @@ class AgentTool:
         height = message_dict.get("height", "unknown")
         
         logger.info(f"Screen recording started from {addr}: {width}x{height} at {fps}fps for {duration}s")
+        logger.debug(f"Raw screen recording start data: {message_dict}")
         
         # Initialize screen recording session
         if not hasattr(self, 'screen_recordings'):
@@ -301,6 +306,8 @@ class AgentTool:
             'total_frames': 0,
             'received_frames': 0
         }
+        
+        logger.info(f"Screen recording session initialized: {session_id}")
 
     def _handle_screen_frame(self, message_dict: dict, addr: tuple) -> None:
         """Handle individual screen recording frame."""
@@ -317,9 +324,9 @@ class AgentTool:
         session['frames'][frame_number] = frame_data
         session['received_frames'] += 1
         
-        # Log progress every 30 frames (1 second at 30fps)
-        if frame_number % 30 == 0:
-            logger.info(f"Screen recording progress from {addr}: frame {frame_number}/{total_frames}")
+        # Log progress every 30 frames (1 second at 30fps) or for the first few frames
+        if frame_number % 30 == 0 or frame_number < 5:
+            logger.info(f"Screen recording progress from {addr}: frame {frame_number}/{total_frames} (received {session['received_frames']} frames)")
 
     def _handle_screen_recording_end(self, message_dict: dict, addr: tuple) -> None:
         """Handle screen recording end and create MP4 video."""
@@ -328,21 +335,30 @@ class AgentTool:
             return
         
         session = self.screen_recordings[addr]
-        self._create_video_from_frames(session, addr)
+        logger.info(f"Screen recording ended from {addr}. Received {session['received_frames']} frames out of {session['total_frames']} expected")
+        
+        if session['received_frames'] == 0:
+            logger.error(f"No frames received for session {session['session_id']}. Cannot create video.")
+        else:
+            self._create_video_from_frames(session, addr)
+        
         del self.screen_recordings[addr]
 
     def _create_video_from_frames(self, session: dict, addr: tuple) -> None:
         """Create MP4 video from collected frames."""
-        import os
-        import tempfile
-        import shutil
-        import ffmpeg
-        
         session_id = session['session_id']
         fps = session['fps']
         frames = session['frames']
         
         logger.info(f"Creating video from {len(frames)} frames for session {session_id}")
+        
+        # Create recordings directory if it doesn't exist
+        recordings_dir = "recordings"
+        try:
+            os.makedirs(recordings_dir, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"Could not create recordings directory: {e}, using current directory")
+            recordings_dir = "."
         
         # Use system temporary directory with proper permissions
         temp_dir = None
@@ -353,30 +369,52 @@ class AgentTool:
             # Save frames as PNG files
             for frame_num in sorted(frames.keys()):
                 frame_data = frames[frame_num]
-                frame_bytes = base64.b64decode(frame_data)
-                frame_filename = os.path.join(temp_dir, f"frame{frame_num:04d}.png")
-                
-                with open(frame_filename, 'wb') as f:
-                    f.write(frame_bytes)
+                try:
+                    frame_bytes = base64.b64decode(frame_data)
+                    frame_filename = os.path.join(temp_dir, f"frame{frame_num:04d}.png")
+                    
+                    with open(frame_filename, 'wb') as f:
+                        f.write(frame_bytes)
+                except Exception as frame_error:
+                    logger.error(f"Error saving frame {frame_num}: {frame_error}")
+                    continue
             
             # Create MP4 using ffmpeg-python
             output_filename = f"screen_recording_{addr[0]}_{session_id}.mp4"
             input_pattern = os.path.join(temp_dir, "frame%04d.png")
             
-            logger.debug(f"Creating video: {output_filename}")
+            # Save video to recordings directory
+            output_path = os.path.join(recordings_dir, output_filename)
+            output_path = os.path.abspath(output_path)
+            logger.debug(f"Creating video: {output_path}")
+            
+            # Check if we have any frames saved
+            frame_files = [f for f in os.listdir(temp_dir) if f.startswith('frame') and f.endswith('.png')]
+            if not frame_files:
+                logger.error("No frame files were saved. Cannot create video.")
+                return
+            
+            logger.info(f"Found {len(frame_files)} frame files. Creating video...")
             
             (
                 ffmpeg
                 .input(input_pattern, framerate=fps)
-                .output(output_filename, vcodec='libx264', pix_fmt='yuv420p')
+                .output(output_path, vcodec='libx264', pix_fmt='yuv420p', loglevel='error')
                 .overwrite_output()
                 .run(capture_stdout=True, capture_stderr=True)
             )
             
-            logger.info(f"Video created successfully: {output_filename}")
+            # Check if video file was actually created
+            if os.path.exists(output_path):
+                file_size = os.path.getsize(output_path)
+                logger.info(f"Video created successfully: {output_path} ({file_size} bytes)")
+            else:
+                logger.error(f"Video file was not created: {output_path}")
                 
         except ffmpeg.Error as e:
-            logger.error(f"FFmpeg error: {e.stderr.decode() if e.stderr else 'Unknown ffmpeg error'}")
+            stderr_output = e.stderr.decode() if e.stderr else 'No stderr output'
+            logger.error(f"FFmpeg error: {stderr_output}")
+            logger.error(f"FFmpeg command failed. Check if ffmpeg is installed on the system.")
         except PermissionError as pe:
             logger.error(f"Permission error creating video: {pe}")
         except Exception as e:

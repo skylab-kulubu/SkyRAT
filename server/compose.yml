@@ -9,5 +9,6 @@ services:
       PRIVATE_KEY_NAME: private.pem
     volumes:
       - ./keys:/server/keys
+      - ./recordings:/server/recordings
     ports:
       - 1911:1911
