@@ -1,4 +1,4 @@
-#include "ss_module.h"
+#include "../headers/ss_module.h"
 #include <iostream>
 #include <windows.h>
 #include <gdiplus.h>

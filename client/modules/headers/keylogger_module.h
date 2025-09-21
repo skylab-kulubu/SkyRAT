@@ -1,5 +1,5 @@
 #pragma once
-#include "../module.h"
+#include "module.h"
 #include <string>
 #include <windows.h>
 #include <fstream>
