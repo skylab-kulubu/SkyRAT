@@ -94,12 +94,13 @@ docker pull quay.io/skylab/skyrat-server:latest
 
 ```bash
 docker run --rm -it -p 4545:4545 \
--e LHOST='0.0.0.0' \
--e LPORT=4545 \
--e PRIVATE_KEY_NAME=keyname.key \
--e TLS=True \
--v ./keys:./keys \
-quay.io/skylab/skyrat-server:latest
+  -e LHOST='0.0.0.0' \
+  -e LPORT=4545 \
+  -e PRIVATE_KEY_NAME=keyname.key \
+  -e TLS=True \
+  -v ./keys:./keys \
+  -v "$(pwd)/recordings:/server/recordings" \
+  quay.io/skylab/skyrat-server:latest
 ```
 
 ---
