@@ -13,18 +13,23 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 
 ## Actions Possible on the Compromised Device
 
-- Keylogging  
-- Screenshot  
-  - Webcam access  
-- Data download / upload  
-- Credential harvesting  
-  - Web  
-  - WiFi  
-  - Computer  
-- Remote Shell / Access  
-- Privilege Escalation  
-- Persistence (Windows Registry operations)  
-- Disabling antivirus software  
+- ▶️ Remote Shell / Access
+- ✅ Keylogging
+- ✅ Screenshot
+  - ✅ Screen Record
+  - ❌ Realtime Screen Record
+  - ❌ Screen Audio record
+- ▶️ Webcam access
+- ❌ Mouse Access
+- ❌ Data download / upload  
+- ❌ Credential harvesting  
+  - ❌ Web  
+  - ❌ WiFi  
+  - ❌ Computer  
+- ❌ Privilege Escalation  
+- ❌ Persistence (Windows Registry operations)  
+- ❌ Disabling antivirus software
+- ❌ Stager program and a shellcode
 
 ---
 
@@ -102,13 +107,6 @@ docker run --rm -it -p 4545:4545 \
   -v "$(pwd)/recordings:/server/recordings" \
   quay.io/skylab/skyrat-server:latest
 ```
-
----
-
-## Optional Features
-
-- A **stager program** can be developed to deliver the main RAT program.  
-- A **payload (shellcode)** can be created to deliver the stager program.
 
 ---
 
