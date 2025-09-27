@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
+#include <windows.h> // DPIAwareness ve diğer Win32 fonksiyonları için gerekli
 
 using namespace Gdiplus;
 
@@ -9,6 +10,12 @@ using namespace Gdiplus;
 const CLSID CLSID_pngCodec = { 0x557CF406, 0x1A04, 0x11D3, { 0x9A, 0x73, 0x00, 0x00, 0xF8, 0x1E, 0xF3, 0x2E } };
 
 ScreenRecording_Module::ScreenRecording_Module() : recording(false) {
+    // ÇÖZÜM: Yüksek DPI (ekran ölçeklendirme) sorunu nedeniyle ekranın
+    // sağ ve alt kısımlarının kesilmesini önlemek için işlemciyi DPI farkında yapar.
+    // Bu, GetSystemMetrics çağrılmadan önce yapılmalıdır.
+    if (!SetProcessDPIAware()) {
+        std::cerr << "[UYARI] SetProcessDPIAware() çağrısı başarısız oldu.\n";
+    }
     InitializeGDIPlus();
 }
 
@@ -35,6 +42,7 @@ void ScreenRecording_Module::ShutdownGDIPlus() {
 }
 
 bool ScreenRecording_Module::CaptureScreenToMemory(std::vector<uint8_t>& pngData) {
+    // SM_CXSCREEN ve SM_CYSCREEN, DPI farkındalığı sayesinde artık tam piksel boyutunu döndürmelidir.
     int width = GetSystemMetrics(SM_CXSCREEN);
     int height = GetSystemMetrics(SM_CYSCREEN);
 
@@ -43,11 +51,14 @@ bool ScreenRecording_Module::CaptureScreenToMemory(std::vector<uint8_t>& pngData
     HBITMAP hBitmap = CreateCompatibleBitmap(hScreenDC, width, height);
     HGDIOBJ hOldBitmap = SelectObject(hMemoryDC, hBitmap);
 
+    // Ekran içeriğini belleğe kopyala
     BitBlt(hMemoryDC, 0, 0, width, height, hScreenDC, 0, 0, SRCCOPY);
     Bitmap bmp(hBitmap, NULL);
 
     IStream* pStream = NULL;
     CreateStreamOnHGlobal(NULL, TRUE, &pStream);
+    
+    // GDI+ kullanarak PNG formatında akışa kaydet
     if (bmp.Save(pStream, &CLSID_pngCodec, NULL) != Ok) {
         pStream->Release();
         SelectObject(hMemoryDC, hOldBitmap);
@@ -69,9 +80,11 @@ bool ScreenRecording_Module::CaptureScreenToMemory(std::vector<uint8_t>& pngData
         return false;
     }
 
+    // Stream boyutunu hesapla ve vektörü yeniden boyutlandır
     ULONGLONG size = ((ULONGLONG)statstg.cbSize.HighPart << 32) | statstg.cbSize.LowPart;
     pngData.resize((size_t)size);
 
+    // Stream'in başına dön ve veriyi vektöre oku
     LARGE_INTEGER liZero = {};
     pStream->Seek(liZero, STREAM_SEEK_SET, NULL);
     ULONG bytesRead = 0;
@@ -110,8 +123,10 @@ bool ScreenRecording_Module::SendStreamEnd(SOCKET sock) {
 }
 
 bool ScreenRecording_Module::SendFrame(SOCKET sock, const std::vector<uint8_t>& pngData, int frameNumber, int totalFrames) {
+    // Base64 kodlama ve gönderme mantığı
     std::vector<char> charData(pngData.begin(), pngData.end());
-    std::string base64Data = base64_encode(charData);
+    // base64_encode() fonksiyonunun harici bir kütüphaneden geldiği varsayılır.
+    std::string base64Data = base64_encode(charData); 
     
     std::map<std::string, std::string> data;
     data["type"] = "screen_frame";
