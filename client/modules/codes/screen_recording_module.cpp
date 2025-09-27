@@ -10,9 +10,7 @@ using namespace Gdiplus;
 const CLSID CLSID_pngCodec = { 0x557CF406, 0x1A04, 0x11D3, { 0x9A, 0x73, 0x00, 0x00, 0xF8, 0x1E, 0xF3, 0x2E } };
 
 ScreenRecording_Module::ScreenRecording_Module() : recording(false) {
-    // ÇÖZÜM: Yüksek DPI (ekran ölçeklendirme) sorunu nedeniyle ekranın
-    // sağ ve alt kısımlarının kesilmesini önlemek için işlemciyi DPI farkında yapar.
-    // Bu, GetSystemMetrics çağrılmadan önce yapılmalıdır.
+    // fixes DPI scaling issue
     if (!SetProcessDPIAware()) {
         std::cerr << "[UYARI] SetProcessDPIAware() çağrısı başarısız oldu.\n";
     }
