@@ -624,3 +624,22 @@ class AgentTool:
         self.del_agent(agent)
         client_socket.close()
         logger.info(f"Connection with {addr} closed")
+
+    # TO DO
+    def add_registry_key(self, agent: Agent, client_socket, socket, hkey: str):
+        pass
+
+    def add_registry_skey(
+        self, agent: Agent, client_socket, socket, hkey: str, skey: str, value: str
+    ):
+        pass
+
+    def remove_registry_skey(
+        self, agent: Agent, client_socket, socket, hkey: str, skey: str
+    ):
+        pass
+
+    def modify_registry_skey(
+        self, agent: Agent, client_socket, socket, hkey: str, skey: str, value: str
+    ):
+        pass
