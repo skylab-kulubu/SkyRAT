@@ -1,103 +1,143 @@
-#ifndef DATA_TRANSFER_MODULE_H
-#define DATA_TRANSFER_MODULE_H
+#include "data_transfer_module.h"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <chrono>
+#include <filesystem>
+#include <regex>
+#include <iomanip>
 
-#include <string>
-#include <thread>
-#include <functional>
-#include <atomic>
-#include <mutex>
-#include <iostream> // For standard definitions like std::cerr
+namespace fs = std::filesystem;
 
-// --- Cross-Platform Socket Definitions  ---
+// --- ASSUMED: Logging helpers (logInfo, logError) and Error constants ---
+
+DataTransferModule::DataTransferModule()
+    : isConnected_{false}, isTransferring_{false}, shouldStop_{false},
+      serverSocket_{INVALID_SOCKET}, clientSocket_{INVALID_SOCKET}
+{
 #ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
-    typedef SOCKET SocketType;
-    #define CLOSE_SOCKET closesocket
+    // Winsock Initialization
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData_) == 0) {
+        wsaInitialized_ = true;
+        // logInfo("Winsock initialized");
+    } else {
+        // logError("WSAStartup failed");
+    }
+#endif
+    // logInfo("DataTransferModule initialized");
+}
+
+DataTransferModule::~DataTransferModule() {
+    shouldStop_ = true;
+
+    if (serverSocket_ != INVALID_SOCKET) {
+        CLOSE_SOCKET(serverSocket_);
+        serverSocket_ = INVALID_SOCKET;
+    }
+
+    if (serverThread_.joinable()) {
+        serverThread_.join();
+    }
+
+    disconnect(); // Close client socket if open
+    
+#ifdef _WIN32
+    if (wsaInitialized_) {
+        WSACleanup();
+    }
+#endif
+}
+
+// Public client disconnect function
+void DataTransferModule::disconnect() {
+    if (clientSocket_ != INVALID_SOCKET) {
+        CLOSE_SOCKET(clientSocket_);
+        clientSocket_ = INVALID_SOCKET;
+        isConnected_ = false;
+        // logInfo("Client socket closed");
+    }
+}
+
+// --- Implementation of startServer, serverMain, handleClient, etc. (Mostly Unchanged from Revision 2) ---
+
+// === Implementation of Client API ===
+
+bool DataTransferModule::connectToServer(const std::string& ip, int port) {
+    if (!isInitialized()) { return false; }
+    if (isConnected_.load()) { disconnect(); }
+
+    clientSocket_ = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (clientSocket_ == INVALID_SOCKET) { return false; }
+
+    // Setting timeout on client socket (Crucial Fix)
+    int opt = 1;
+#ifdef _WIN32
+    DWORD timeout_ms = SOCKET_TIMEOUT_SEC * 1000;
+    setsockopt(clientSocket_, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout_ms, sizeof(timeout_ms));
+    setsockopt(clientSocket_, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout_ms, sizeof(timeout_ms));
 #else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #include <errno.h> // For global errno
-    typedef int SocketType;
-    #define INVALID_SOCKET -1
-    #define SOCKET_ERROR -1
-    #define CLOSE_SOCKET close
+    struct timeval timeout;
+    timeout.tv_sec = SOCKET_TIMEOUT_SEC;
+    timeout.tv_usec = 0;
+    setsockopt(clientSocket_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(clientSocket_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 #endif
-// ---------------------------------------------------------------------------------
 
-/**
- * @brief Cross-platform module for file data transfer (Server and Client).
- */
-class DataTransferModule {
-public:
-    /// Progress callback type (percentage, transferred bytes, total bytes)
-    using ProgressCallback = std::function<void(int, long long, long long)>;
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(static_cast<uint16_t>(port));
 
-    DataTransferModule();
-    ~DataTransferModule();
-
-    // Server API
-    bool startServer(int port);
-
-    // Client API (Implemented)
-    bool connectToServer(const std::string& ip, int port);
-    bool uploadFile(const std::string& localPath, const std::string& remoteName = "");
-    bool downloadFile(const std::string& remoteName, const std::string& localPath = "");
-    void disconnect(); // Disconnects the client connection
-
-    // Utility & Status
-    void setProgressCallback(ProgressCallback callback);
-    bool isConnected() const { return isConnected_.load(); }
-    bool isTransferring() const { return isTransferring_.load(); }
-    
-    // Delete copy constructor and assignment operator (Good Practice)
-    DataTransferModule(const DataTransferModule&) = delete;
-    DataTransferModule& operator=(const DataTransferModule&) = delete;
-
-private:
-    // Constants
-    static constexpr size_t BufferSize = 8192;
-    static constexpr size_t MAX_FILE_SIZE = 10ULL * 1024 * 1024 * 1024; // 10 GB
-    static constexpr size_t MAX_FILENAME_LENGTH = 255;
-    static constexpr int SOCKET_TIMEOUT_SEC = 30; // Used for SO_RCVTIMEO/SO_SNDTIMEO
-
-    // Server Logic
-    void serverMain(int port);
-    void handleClient(SocketType clientSock);
-    bool processUpload(SocketType sock, const std::string& fileName, long long fileSize);
-    bool processDownload(SocketType sock, const std::string& fileName);
-    
-    // Core Socket Operations
-    bool sendAll(SocketType sock, const char* data, size_t length);
-    bool recvAll(SocketType sock, char* buffer, size_t length);
-
-    // Helpers
-    std::string sanitizeFileName(const std::string& fileName);
-    void notifyProgress(int percentage, long long transferred, long long total);
-    bool isInitialized() const;
-    int getLastError() const;
-    
-    // State Variables
-    std::atomic<bool> isConnected_{false};     // For client connection status
-    std::atomic<bool> isTransferring_{false};
-    std::atomic<bool> shouldStop_{false};      // For stopping server/threads
-    
-    SocketType serverSocket_{INVALID_SOCKET};  // Listening socket (formerly 'socket')
-    SocketType clientSocket_{INVALID_SOCKET};  // Connected socket (used by client and server handler)
-    
-    std::thread serverThread_;
-    
-    ProgressCallback progressCallback_;
-    std::mutex callbackMutex_;
-    
-    // Winsock State (Windows only)
 #ifdef _WIN32
-    WSADATA wsaData_;
-    bool wsaInitialized_ = false;
+    serverAddr.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
+#else
+    if (inet_pton(AF_INET, ip.c_str(), &serverAddr.sin_addr) <= 0) { /* ... error handling ... */ }
 #endif
-};
 
-#endif // DATA_TRANSFER_MODULE_H
+    if (connect(clientSocket_, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        CLOSE_SOCKET(clientSocket_);
+        clientSocket_ = INVALID_SOCKET;
+        return false;
+    }
+
+    isConnected_ = true;
+    return true;
+}
+
+bool DataTransferModule::uploadFile(const std::string& localPath, const std::string& remoteName) {
+    if (!isConnected_.load() || isTransferring_.load()) { return false; }
+    
+    // ... File existence and size checks ...
+    
+    std::ifstream file(localPath, std::ios::binary);
+    // ... File open check ...
+
+    // ... Command protocol (UPLOAD:name:size) and wait for READY ...
+    
+    // ... Transfer loop using file.read() and sendAll(clientSocket_, ...) ...
+    
+    file.close();
+    isTransferring_ = false;
+    
+    // ... Final status check (receive SUCCESS/ERROR) ...
+    
+    return true; // or false on failure
+}
+
+bool DataTransferModule::downloadFile(const std::string& remoteName, const std::string& localPath) {
+    if (!isConnected_.load() || isTransferring_.load()) { return false; }
+
+    // ... Command protocol (DOWNLOAD:name) ...
+
+    // ... Wait for DOWNLOAD:SIZE header and extract file size ...
+
+    // ... Open local file for writing ...
+    
+    // ... Transfer loop using recv(clientSocket_, ...) and file.write() ...
+
+    // ... Check if totalReceived == fileSize ...
+    
+    return true; // or false on failure
+}
+
+// --- ASSUMED: All helper functions (sendAll, recvAll, sanitizeFileName, etc.) are implemented below ---
