@@ -1,0 +1,30 @@
+FROM python:3.13-slim
+
+ARG LPORT=1911
+ARG WORKDIR=/server
+
+# Create a non-root user and group
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+
+WORKDIR ${WORKDIR}
+
+ENV VIRTUAL_ENV=${WORKDIR}/venv
+ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
+
+COPY . .
+
+RUN python -m venv $VIRTUAL_ENV && \
+  pip install --upgrade pip && \
+  pip install --no-cache-dir -r requirement.txt
+
+# Change ownership of the working directory to writeable by appuser
+RUN chown -R appuser:appgroup ${WORKDIR}
+
+EXPOSE ${LPORT}
+
+# Switch to the non-root user
+USER appuser
+
+CMD ["python", "server.py"]

@@ -1,0 +1,8 @@
+=== Keylogger Session Started ===2025-10-14 10:24:56===
+Keyboard Layout: English
+3131313131313sljvbosvnpdv[ENTER]stop_Keylogger[ENTER]1[ENTER]
+=== Keylogger Session Ended ===2025-10-14 10:25:05===
+=== Keylogger Session Started ===2025-10-14 14:49:53===
+Keyboard Layout: English
+[TAB]selamben mnertcan 123456789876543212345678909876543234567stop_Keylogger[ENTER]1[ENTER]
+=== Keylogger Session Ended ===2025-10-14 14:50:14===
