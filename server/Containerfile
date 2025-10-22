@@ -49,4 +49,4 @@ EXPOSE ${LPORT}
 
 USER nonroot
 
-CMD ["python", "server.py"]
+CMD ["/server/venv/bin/python", "/server/server.py"]
