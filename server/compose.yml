@@ -1,6 +1,6 @@
 services:
   skyrat-server:
-    image: quay.io/farukerdem34/skyrat-server
+    image: quay.io/skylab/skyrat-server:latest
     tty: true
     stdin_open: true
     environment:
