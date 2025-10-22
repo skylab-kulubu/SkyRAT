@@ -278,6 +278,10 @@ class AgentTool:
             self._handle_single_file_transfer(message_dict, addr)
         elif message_type == "file_chunk":
             self._handle_structured_file_chunk(message_dict, addr)
+        elif message_type == "response":
+            self._handle_response_message(message_dict, addr)
+        elif message_type == "error":
+            self._handle_error_message(message_dict, addr)
         else:
             logger.warning(f"Unknown structured message type: {message_type} from {addr}")
 
@@ -511,6 +515,25 @@ class AgentTool:
     def _is_file_transfer_message(self, message: str) -> bool:
         """Check if message is related to file transfer."""
         return message.startswith(("FILE_START:", "FILE_CHUNK:", "FILE_END:"))
+
+    def _handle_response_message(self, message_dict: dict, addr: tuple) -> None:
+        """Handle response messages from clients."""
+        response = message_dict.get("response", "")
+        success = message_dict.get("success", "false")
+        
+        status = "SUCCESS" if success.lower() == "true" else "FAILURE"
+        logger.info(f"Received from {addr}: {status} - {response}")
+
+    def _handle_error_message(self, message_dict: dict, addr: tuple) -> None:
+        """Handle error messages from clients."""
+        error = message_dict.get("error", "Unknown error")
+        error_code = message_dict.get("error_code", "")
+        
+        error_msg = f"ERROR: {error}"
+        if error_code:
+            error_msg += f" (Code: {error_code})"
+            
+        logger.error(f"Received from {addr}: {error_msg}")
 
     def _handle_file_transfer_message(self, message: str, file_transfer_state: dict, addr: tuple) -> None:
         """Handle different types of file transfer messages."""
