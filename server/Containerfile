@@ -30,7 +30,7 @@ RUN python -m venv $VIRTUAL_ENV && \
 COPY . .
 
 
-FROM gcr.io/distroless/python3-debian12
+FROM gcr.io/distroless/python3-debian12:nonroot
 
 ARG LPORT=1911
 ARG WORKDIR=/server
