@@ -1,8 +1,11 @@
-keys/
-__pycache_
+__pycache__
 .env*
-Containerfile
-README.md
-test*.py
-.contanerignore
+test-client.py
+.venv/
 .trivyignore
+compose.yml
+Containerfile
+Jenkinsfile
+keys/
+README.md 
+test*.py
