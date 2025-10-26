@@ -64,7 +64,7 @@ sudo yum install buildah
 
 ```bash
 IMAGE_NAME="quay.io/skylab/skyrat-server:latest"
-buildah --jobs "$(nproc)" -t "${IMAGE_NAME}" "${PWD}"
+buildah build --jobs "$(nproc)" -t "${IMAGE_NAME}" "${PWD}"
 ```
 
 ## Using Built Image in Docker 
