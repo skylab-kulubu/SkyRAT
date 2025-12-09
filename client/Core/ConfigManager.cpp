@@ -20,7 +20,7 @@ namespace Core {
         
         // Server connection settings
         m_config["server_ip"] = std::string("127.0.0.1");
-        m_config["server_port"] = static_cast<uint16_t>(4545);
+        m_config["server_port"] = static_cast<uint16_t>(1911);
         
         // Network settings
         m_config["receive_buffer_size"] = 1024;
@@ -129,7 +129,7 @@ namespace Core {
     }
 
     uint16_t ConfigManager::getServerPort() const {
-        return getValue<uint16_t>("server_port", 4545);
+        return getValue<uint16_t>("server_port", 1911);
     }
 
     int ConfigManager::getReceiveBufferSize() const {
@@ -197,7 +197,7 @@ namespace Core {
         uint16_t port = getServerPort();
         if (port == 0) {
             std::cerr << "Warning: Invalid server port, using default" << std::endl;
-            setServerPort(4545);
+            setServerPort(1911);
         }
 
         // Validate buffer size

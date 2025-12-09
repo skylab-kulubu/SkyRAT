@@ -167,7 +167,7 @@ namespace Tests {
             test("ConfigManager::default_server_ip", 
                 configManager->getServerIP() == "127.0.0.1");
             test("ConfigManager::default_server_port", 
-                configManager->getServerPort() == 4545);
+                configManager->getServerPort() == 1911);
             
             // Test configuration changes
             configManager->setServerIP("192.168.1.100");

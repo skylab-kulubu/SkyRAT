@@ -1,4 +1,5 @@
 #include "Utilities.h"
+#include "../Include/Platform.h"
 #include <algorithm>
 #include <sstream>
 #include <fstream>
@@ -7,12 +8,6 @@
 #include <ctime>
 #include <chrono>
 #include <regex>
-#include <windows.h>
-#include <direct.h>
-#include <io.h>
-#include <sys/stat.h>
-#include <shlwapi.h>
-#pragma comment(lib, "shlwapi.lib")
 
 namespace SkyRAT {
 namespace Utils {
@@ -118,19 +113,40 @@ std::string StringUtils::replace(const std::string& str, const std::string& sear
 std::wstring StringUtils::stringToWstring(const std::string& str) {
     if (str.empty()) return std::wstring();
     
-    int size_needed = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
-    std::wstring wstrTo(size_needed, 0);
-    MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
-    return wstrTo;
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        int size_needed = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
+        std::wstring wstrTo(size_needed, 0);
+        MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
+        return wstrTo;
+    #else
+        // On Unix platforms, use simple ASCII conversion for now
+        // For proper Unicode support, consider using ICU library
+        std::wstring result;
+        result.reserve(str.size());
+        for (char c : str) {
+            result.push_back(static_cast<wchar_t>(c));
+        }
+        return result;
+    #endif
 }
 
 std::string StringUtils::wstringToString(const std::wstring& wstr) {
     if (wstr.empty()) return std::string();
     
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
-    std::string strTo(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
-    return strTo;
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+        std::string strTo(size_needed, 0);
+        WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
+        return strTo;
+    #else
+        // On Unix platforms, use simple ASCII conversion for now
+        std::string result;
+        result.reserve(wstr.size());
+        for (wchar_t wc : wstr) {
+            result.push_back(static_cast<char>(wc));
+        }
+        return result;
+    #endif
 }
 
 // === FileUtils Implementation ===
@@ -144,9 +160,14 @@ std::string FileUtils::extractDirectory(const std::string& filepath) {
 }
 
 bool FileUtils::directoryExists(const std::string& path) {
-    DWORD dwAttrib = GetFileAttributesA(path.c_str());
-    return (dwAttrib != INVALID_FILE_ATTRIBUTES && 
-            (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        DWORD dwAttrib = GetFileAttributesA(path.c_str());
+        return (dwAttrib != INVALID_FILE_ATTRIBUTES && 
+                (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+    #else
+        struct stat statbuf;
+        return (stat(path.c_str(), &statbuf) == 0 && S_ISDIR(statbuf.st_mode));
+    #endif
 }
 
 std::string FileUtils::sanitizeFileName(const std::string& filename) {
@@ -201,8 +222,13 @@ std::string FileUtils::getDirectory(const std::string& filepath) {
 }
 
 bool FileUtils::fileExists(const std::string& filepath) {
-    DWORD dwAttrib = GetFileAttributesA(filepath.c_str());
-    return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        DWORD dwAttrib = GetFileAttributesA(filepath.c_str());
+        return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+    #else
+        struct stat statbuf;
+        return (stat(filepath.c_str(), &statbuf) == 0 && S_ISREG(statbuf.st_mode));
+    #endif
 }
 
 long long FileUtils::getFileSize(const std::string& filepath) {
@@ -215,7 +241,11 @@ long long FileUtils::getFileSize(const std::string& filepath) {
 }
 
 bool FileUtils::createDirectory(const std::string& dirpath) {
-    return CreateDirectoryA(dirpath.c_str(), NULL) != 0 || GetLastError() == ERROR_ALREADY_EXISTS;
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        return CreateDirectoryA(dirpath.c_str(), NULL) != 0 || GetLastError() == ERROR_ALREADY_EXISTS;
+    #else
+        return mkdir(dirpath.c_str(), 0755) == 0 || errno == EEXIST;
+    #endif
 }
 
 std::string FileUtils::readFileToString(const std::string& filepath) {
@@ -458,7 +488,7 @@ std::vector<char> NetworkUtils::createMessage(const std::map<std::string, std::s
     return createMessage(oss.str());
 }
 
-bool NetworkUtils::sendAll(SOCKET socket, const char* data, size_t length) {
+bool NetworkUtils::sendAll(skyrat_socket_t socket, const char* data, size_t length) {
     size_t totalSent = 0;
     
     while (totalSent < length) {
@@ -472,7 +502,7 @@ bool NetworkUtils::sendAll(SOCKET socket, const char* data, size_t length) {
     return true;
 }
 
-bool NetworkUtils::recvAll(SOCKET socket, char* buffer, size_t length) {
+bool NetworkUtils::recvAll(skyrat_socket_t socket, char* buffer, size_t length) {
     size_t totalReceived = 0;
     
     while (totalReceived < length) {
@@ -486,12 +516,12 @@ bool NetworkUtils::recvAll(SOCKET socket, char* buffer, size_t length) {
     return true;
 }
 
-bool NetworkUtils::sendMessage(SOCKET socket, const std::string& message) {
+bool NetworkUtils::sendMessage(skyrat_socket_t socket, const std::string& message) {
     auto messageData = createMessage(message);
     return sendAll(socket, messageData.data(), messageData.size());
 }
 
-bool NetworkUtils::sendMessage(SOCKET socket, const std::map<std::string, std::string>& data) {
+bool NetworkUtils::sendMessage(skyrat_socket_t socket, const std::map<std::string, std::string>& data) {
     auto messageData = createMessage(data);
     return sendAll(socket, messageData.data(), messageData.size());
 }
@@ -512,60 +542,115 @@ bool NetworkUtils::isValidPort(int port) {
 bool SystemUtils::createDirectory(const std::string& path) {
     if (path.empty()) return false;
 
-    // For Windows, convert path separators and create recursively
-    std::string windowsPath = path;
-    std::replace(windowsPath.begin(), windowsPath.end(), '/', '\\');
-    
-    // Try to create directory
-    if (CreateDirectoryA(windowsPath.c_str(), NULL) != 0) {
-        return true; // Success
-    }
-    
-    DWORD error = GetLastError();
-    if (error == ERROR_ALREADY_EXISTS) {
-        return true; // Already exists
-    } else if (error == ERROR_PATH_NOT_FOUND) {
-        // Parent doesn't exist, create it recursively
-        size_t lastBackslash = windowsPath.find_last_of('\\');
-        if (lastBackslash != std::string::npos) {
-            std::string parentPath = windowsPath.substr(0, lastBackslash);
-            if (createDirectory(parentPath)) {
-                return CreateDirectoryA(windowsPath.c_str(), NULL) != 0;
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        // For Windows, convert path separators and create recursively
+        std::string windowsPath = path;
+        std::replace(windowsPath.begin(), windowsPath.end(), '/', '\\');
+        
+        // Try to create directory
+        if (CreateDirectoryA(windowsPath.c_str(), NULL) != 0) {
+            return true; // Success
+        }
+        
+        DWORD error = GetLastError();
+        if (error == ERROR_ALREADY_EXISTS) {
+            return true; // Already exists
+        } else if (error == ERROR_PATH_NOT_FOUND) {
+            // Parent doesn't exist, create it recursively
+            size_t lastBackslash = windowsPath.find_last_of('\\');
+            if (lastBackslash != std::string::npos) {
+                std::string parentPath = windowsPath.substr(0, lastBackslash);
+                if (createDirectory(parentPath)) {
+                    return CreateDirectoryA(windowsPath.c_str(), NULL) != 0;
+                }
             }
         }
-    }
-    return false;
+        return false;
+    #else
+        // For Unix-like systems
+        if (mkdir(path.c_str(), 0755) == 0) {
+            return true; // Success
+        }
+        
+        if (errno == EEXIST) {
+            return true; // Already exists
+        } else if (errno == ENOENT) {
+            // Parent doesn't exist, create it recursively
+            size_t lastSlash = path.find_last_of('/');
+            if (lastSlash != std::string::npos) {
+                std::string parentPath = path.substr(0, lastSlash);
+                if (createDirectory(parentPath)) {
+                    return mkdir(path.c_str(), 0755) == 0;
+                }
+            }
+        }
+        return false;
+    #endif
 }
 
 std::string SystemUtils::getCurrentDirectory() {
-    char buffer[MAX_PATH];
-    if (_getcwd(buffer, MAX_PATH) != nullptr) {
-        return std::string(buffer);
-    }
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        char buffer[MAX_PATH];
+        if (_getcwd(buffer, MAX_PATH) != nullptr) {
+            return std::string(buffer);
+        }
+    #else
+        char buffer[SKYRAT_MAX_PATH];
+        if (getcwd(buffer, SKYRAT_MAX_PATH) != nullptr) {
+            return std::string(buffer);
+        }
+    #endif
     return "";
 }
 
 std::string SystemUtils::getExecutableDirectory() {
-    char buffer[MAX_PATH];
-    DWORD length = GetModuleFileNameA(NULL, buffer, MAX_PATH);
-    if (length > 0) {
-        std::string path(buffer);
-        return FileUtils::getDirectory(path);
-    }
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        char buffer[MAX_PATH];
+        DWORD length = GetModuleFileNameA(NULL, buffer, MAX_PATH);
+        if (length > 0) {
+            std::string path(buffer);
+            return FileUtils::getDirectory(path);
+        }
+    #else
+        char buffer[SKYRAT_MAX_PATH];
+        ssize_t length = readlink("/proc/self/exe", buffer, SKYRAT_MAX_PATH - 1);
+        if (length != -1) {
+            buffer[length] = '\0';
+            std::string path(buffer);
+            return FileUtils::getDirectory(path);
+        }
+    #endif
     return "";
 }
 
 std::string SystemUtils::getTempDirectory() {
-    char buffer[MAX_PATH];
-    DWORD length = GetTempPathA(MAX_PATH, buffer);
-    if (length > 0) {
-        return std::string(buffer);
-    }
-    return "C:\\temp\\";
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        char buffer[MAX_PATH];
+        DWORD length = GetTempPathA(MAX_PATH, buffer);
+        if (length > 0) {
+            return std::string(buffer);
+        }
+        return "C:\\temp\\";
+    #else
+        const char* tmpdir = getenv("TMPDIR");
+        if (tmpdir) return std::string(tmpdir);
+        
+        tmpdir = getenv("TMP");
+        if (tmpdir) return std::string(tmpdir);
+        
+        tmpdir = getenv("TEMP");
+        if (tmpdir) return std::string(tmpdir);
+        
+        return "/tmp/";
+    #endif
 }
 
 void SystemUtils::sleep(int milliseconds) {
-    Sleep(static_cast<DWORD>(milliseconds));
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        Sleep(static_cast<DWORD>(milliseconds));
+    #else
+        usleep(milliseconds * 1000);
+    #endif
 }
 
 std::string SystemUtils::getEnvironmentVariable(const std::string& name, const std::string& defaultValue) {
@@ -574,20 +659,28 @@ std::string SystemUtils::getEnvironmentVariable(const std::string& name, const s
 }
 
 std::string SystemUtils::getWindowsErrorMessage(DWORD errorCode) {
-    if (errorCode == 0) {
-        errorCode = GetLastError();
-    }
-    
-    LPSTR messageBuffer = nullptr;
-    DWORD size = FormatMessageA(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPSTR)&messageBuffer, 0, NULL);
-    
-    std::string message(messageBuffer, size);
-    LocalFree(messageBuffer);
-    
-    return StringUtils::trim(message);
+    #ifdef SKYRAT_PLATFORM_WINDOWS
+        if (errorCode == 0) {
+            errorCode = GetLastError();
+        }
+        
+        LPSTR messageBuffer = nullptr;
+        DWORD size = FormatMessageA(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPSTR)&messageBuffer, 0, NULL);
+        
+        std::string message(messageBuffer, size);
+        LocalFree(messageBuffer);
+        
+        return StringUtils::trim(message);
+    #else
+        // On Unix-like systems, use errno and strerror
+        if (errorCode == 0) {
+            errorCode = static_cast<DWORD>(errno);
+        }
+        return std::string(strerror(static_cast<int>(errorCode)));
+    #endif
 }
 
 } // namespace Utils

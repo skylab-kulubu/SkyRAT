@@ -96,6 +96,34 @@ cmake --build . --config Release
 .\Release\SkyRAT_Client.exe
 ```
 
+---
+
+### Cross-compilation (Unix → Windows)
+
+#### Using build script
+```bash
+# Make script executable
+chmod +x scripts/build-cross-mingw.sh
+
+# Check MinGW-w64 installation
+./scripts/build-cross-mingw.sh check
+
+# Build for Windows
+./scripts/build-cross-mingw.sh
+```
+
+#### Manual cross-compilation
+```bash
+mkdir build-mingw && cd build-mingw
+
+cmake \
+    -DCMAKE_TOOLCHAIN_FILE=../cmake/mingw-w64-toolchain.cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    ..
+
+make -j$(nproc)
+```
+
 
 ### Build Outputs
 - **`SkyRAT_Client.exe`** - Main client application

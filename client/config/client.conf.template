@@ -4,7 +4,7 @@
 [Connection]
 # Server connection settings
 server_ip = 127.0.0.1
-server_port = 4545
+server_port = 1911
 connection_timeout = 5000
 auto_reconnect = true
 reconnect_interval = 3000

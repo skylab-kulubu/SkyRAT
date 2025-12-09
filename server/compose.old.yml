@@ -1,0 +1,14 @@
+services:
+  skyrat-server:
+    image: quay.io/skylab/skyrat-server
+    tty: true
+    stdin_open: true
+    environment:
+      LHOST: 0.0.0.0
+      LPORT: 1911
+      PRIVATE_KEY_NAME: private.pem
+    volumes:
+      - ./keys:/server/keys
+      - ./recordings:/server/recordings
+    ports:
+      - 1911:1911

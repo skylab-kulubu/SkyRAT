@@ -5,8 +5,7 @@
 #include <map>
 #include <chrono>
 #include <functional>
-#include <winsock2.h>
-#include <windows.h>
+#include "../Include/Platform.h"
 
 namespace SkyRAT {
 namespace Utils {
@@ -298,7 +297,7 @@ namespace Utils {
          * @param length Length of data
          * @return true if all data sent successfully
          */
-        static bool sendAll(SOCKET socket, const char* data, size_t length);
+        static bool sendAll(skyrat_socket_t socket, const char* data, size_t length);
 
         /**
          * @brief Receive all data from socket
@@ -307,7 +306,7 @@ namespace Utils {
          * @param length Length of data to receive
          * @return true if all data received successfully
          */
-        static bool recvAll(SOCKET socket, char* buffer, size_t length);
+        static bool recvAll(skyrat_socket_t socket, char* buffer, size_t length);
 
         /**
          * @brief Send string message through socket
@@ -315,7 +314,7 @@ namespace Utils {
          * @param message Message to send
          * @return true if sent successfully
          */
-        static bool sendMessage(SOCKET socket, const std::string& message);
+        static bool sendMessage(skyrat_socket_t socket, const std::string& message);
 
         /**
          * @brief Send structured data through socket
@@ -323,7 +322,7 @@ namespace Utils {
          * @param data Key-value data to send
          * @return true if sent successfully
          */
-        static bool sendMessage(SOCKET socket, const std::map<std::string, std::string>& data);
+        static bool sendMessage(skyrat_socket_t socket, const std::map<std::string, std::string>& data);
 
         /**
          * @brief Validate IP address format

@@ -7,9 +7,7 @@
 #include <functional>
 #include <chrono>
 #include <map>
-#include <winsock2.h>
-#include <windows.h>
-#pragma comment(lib, "ws2_32.lib")
+#include "../Include/Platform.h"
 
 // Forward declarations
 namespace SkyRAT {
@@ -46,7 +44,7 @@ namespace Core {
             Failed
         };
 
-        using MessageHandler = std::function<void(const std::string&, SOCKET)>;
+        using MessageHandler = std::function<void(const std::string&, skyrat_socket_t)>;
 
         ConnectionManager(std::shared_ptr<ConfigManager> configManager,
                          std::shared_ptr<Utils::Logger> logger);
@@ -166,7 +164,7 @@ namespace Core {
         std::atomic<bool> m_shouldReconnect;
         
         // Socket management
-        SOCKET m_socket;
+        skyrat_socket_t m_socket;
         std::string m_serverIP;
         uint16_t m_serverPort;
         int m_receiveBufferSize;
@@ -187,7 +185,7 @@ namespace Core {
         bool initializeSocketSubsystem();
         void cleanupSocketSubsystem();
         
-        SOCKET createAndConnectSocket();
+        skyrat_socket_t createAndConnectSocket();
         void closeSocket();
         
         bool connectToServer();

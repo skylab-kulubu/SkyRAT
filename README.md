@@ -12,14 +12,14 @@ The author assumes **no responsibility** for any damage or misuse of the informa
 # RAT Project Scope
 
 ## Actions Possible on the Compromised Device
-
-- ▶️ Remote Shell / Access
+Some of these modules are already written. But right now we are trying to implement them to a new structured client.
+- ❌ Remote Shell / Access
 - ✅ Keylogging
-- ✅ Screenshot
-  - ✅ Screen Record
+- ❌ Screenshot
+  - ❌ Screen Record
   - ❌ Realtime Screen Record
   - ❌ Screen Audio record
-- ▶️ Webcam access
+- ❌ Webcam access
 - ❌ Mouse Access
 - ❌ Data download / upload  
 - ❌ Credential harvesting  
@@ -49,7 +49,7 @@ The author assumes **no responsibility** for any damage or misuse of the informa
   - Screenshot module  
   - AV disabler module  
   - etc.  
-
+- Once the project looks like a decent thing, the Python C2 server can be developed. It can be separated into a C2 server and client.
 ---
 
 ## Server Side
@@ -98,9 +98,9 @@ docker pull quay.io/skylab/skyrat-server:latest
 ```
 
 ```bash
-docker run --rm -it -p 4545:4545 \
+docker run --rm -it -p 1911:1911 \
   -e LHOST='0.0.0.0' \
-  -e LPORT=4545 \
+  -e LPORT=1911 \
   -e PRIVATE_KEY_NAME=keyname.key \
   -e TLS=True \
   -v ./keys:./keys \
@@ -108,6 +108,22 @@ docker run --rm -it -p 4545:4545 \
   quay.io/skylab/skyrat-server:latest
 ```
 
+##### Build & Run Locally
+Inside server/
+```bash
+docker build -t skyrat-server .
+```
+
+```bash
+docker run --rm -it -p 1911:1911 \
+  -e LHOST='0.0.0.0' \
+  -e LPORT=1911 \
+  -e PRIVATE_KEY_NAME=keyname.key \
+  -e TLS=True \
+  -v ./keys:./keys \
+  -v "$(pwd)/recordings:/server/recordings" \
+  skyrat-server
+```
 ---
 
 ## Authors

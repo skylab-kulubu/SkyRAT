@@ -1,14 +1,74 @@
+version: '3.8'
+
 services:
   skyrat-server:
-    image: quay.io/farukerdem34/skyrat-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - LPORT=${LPORT:-1911}
+    image: skyrat-server:latest
+    container_name: skyrat-server
+    restart: unless-stopped
     tty: true
     stdin_open: true
     environment:
-      LHOST: 0.0.0.0
-      LPORT: 1911
-      PRIVATE_KEY_NAME: private.pem
+      - LHOST=${LHOST:-0.0.0.0}
+      - LPORT=${LPORT:-1911}
+      - PRIVATE_KEY_NAME=${PRIVATE_KEY_NAME:-private.pem}
+      - PYTHONUNBUFFERED=1
+      - TZ=${TZ:-UTC}
     volumes:
-      - ./keys:/server/keys
-      - ./recordings:/server/recordings
+      - ./keys:/app/keys:rw
+      - ./recordings:/app/recordings:rw
+      - ./logs:/app/logs:rw
+      - /etc/localtime:/etc/localtime:ro
     ports:
-      - 1911:1911
+      - "${LPORT:-1911}:${LPORT:-1911}"
+    networks:
+      - skyrat-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', int('${LPORT:-1911}'))); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE  # Only if using privileged ports
+    user: "1001:1001"
+
+  # Optional: Redis for session management (if needed)
+  redis:
+    image: redis:7-alpine
+    container_name: skyrat-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-skyrat-redis-pass}
+    volumes:
+      - redis-data:/data
+    networks:
+      - skyrat-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=10m
+    profiles:
+      - redis  # Use with: docker compose --profile redis up
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  skyrat-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
