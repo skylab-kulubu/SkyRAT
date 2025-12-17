@@ -1,35 +1,52 @@
-FROM python:alpine3.21
+FROM python:3-slim-bookworm AS builder
 
-ARG LPORT=1911
 ARG WORKDIR=/server
-
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
-
-RUN apk add --no-cache ffmpeg
-
+ENV WORKDIR=${WORKDIR}
 WORKDIR ${WORKDIR}
+
+RUN apt-get update -y && \
+  apt-get install -y --no-install-recommends \
+  build-essential \
+  libffi-dev \
+  python3-dev \
+  curl \
+  ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN curl -L "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz" -o ffmpeg.tar.xz && \
+  tar -xvf ffmpeg.tar.xz && \
+  # Çıkarılan klasörün adı değişebilir, bu yüzden joker karakter (*) kullanıyoruz
+  mv ffmpeg-git-*-static/ffmpeg /usr/local/bin/ffmpeg && \
+  # Arşiv ve çıkarılan klasörleri temizle
+  rm -rf ffmpeg.tar.xz ffmpeg-git-*-static
 
 ENV VIRTUAL_ENV=${WORKDIR}/venv
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
-RUN python -m venv $VIRTUAL_ENV
-
 COPY requirement.txt .
-
-RUN apk add --no-cache --virtual .build-deps \
-        build-base \
-        python3-dev \
-        libffi-dev && \
-    pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirement.txt && \
-    apk del .build-deps
+RUN python -m venv $VIRTUAL_ENV && \
+  pip install --no-cache-dir -r requirement.txt
 
 COPY . .
 
-RUN chown -R appuser:appgroup ${WORKDIR}
+
+FROM gcr.io/distroless/python3-debian12:nonroot
+
+ARG LPORT=1911
+ARG WORKDIR=/server
+ENV WORKDIR=${WORKDIR}
+WORKDIR ${WORKDIR}
+
+COPY --from=builder --chown=65532:65532 ${WORKDIR}/venv ${WORKDIR}/venv
+COPY --from=builder --chown=65532:65532 ${WORKDIR} ${WORKDIR}
+
+COPY --from=builder --chown=65532:65532 /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
+
+ENV VIRTUAL_ENV=${WORKDIR}/venv
+ENV PATH="${VIRTUAL_ENV}/bin:/usr/local/bin:$PATH"
 
 EXPOSE ${LPORT}
 
-USER appuser
+USER nonroot
 
-CMD ["python", "server.py"]
+CMD ["/server/server.py"]
